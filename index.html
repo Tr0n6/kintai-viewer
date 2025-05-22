@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>勤怠管理表 簡易ビューア</title>
+  <style>
+    body { padding: 16px; font-family: Arial, sans-serif; }
+    h1 { font-size: 1.5em; margin-bottom: 1em; }
+    #attendance { margin-top: 1em; }
+    table { width: 100%; border-collapse: collapse; margin-top: 1em; }
+    th, td { padding: 8px; border: 1px solid #ccc; }
+    th { background: #f5f5f5; }
+    .error { color: red; margin-top: 1em; }
+    .form-row { margin-bottom: 1em; }
+    label { display: inline-block; width: 120px; }
+    input { padding: 4px; }
+    button { padding: 6px 16px; }
+  </style>
+</head>
+<body>
+  <h1>勤怠管理表 簡易ビューア</h1>
+  <form id="searchForm">
+    <div class="form-row">
+      <label for="companyPassword">企業パスワード:</label>
+      <input type="password" id="companyPassword" required>
+    </div>
+    <div class="form-row">
+      <label for="userId">ユーザーID:</label>
+      <input type="text" id="userId" required>
+    </div>
+    <button type="submit">表示</button>
+  </form>
+  <div id="attendance"></div>
+  <div class="error" id="error"></div>
+  <script>
+    const API_URL = 'https://script.google.com/macros/s/AKfycbzN7N3zs4UOPJ6tvXFr_LXHtjk22Lo2J0kIk0BL0DDkVywxrJH_F9xmjtTVa9LQLvBZ/exec';
+    document.getElementById('searchForm').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      document.getElementById('attendance').innerHTML = '';
+      document.getElementById('error').textContent = '';
+      const password = document.getElementById('companyPassword').value.trim();
+      const userId = document.getElementById('userId').value.trim();
+      if (!password || !userId) {
+        document.getElementById('error').textContent = 'パスワードとユーザーIDを入力してください。';
+        return;
+      }
+      try {
+        const url = `${API_URL}?password=${encodeURIComponent(password)}&userId=${encodeURIComponent(userId)}`;
+        const res = await fetch(url);
+        const records = await res.json();
+        if (records.error || records.status === 'error') {
+          document.getElementById('error').textContent = records.message || records.error || 'データ取得エラー';
+          return;
+        }
+        renderTable(records);
+      } catch (err) {
+        document.getElementById('error').textContent = '通信エラー: ' + err;
+      }
+    });
+    function renderTable(records) {
+      if (!Array.isArray(records) || records.length === 0) {
+        document.getElementById('attendance').textContent = '今月の勤怠記録がありません';
+        return;
+      }
+      let html = '<table>';
+      html += '<thead><tr>';
+      html += '<th>日付</th><th>出勤時刻</th><th>退勤時刻</th><th>労働時間</th><th>休憩時間</th><th>勤怠状況</th>';
+      html += '</tr></thead><tbody>';
+      records.forEach(rec => {
+        const sortedEvents = (rec.clockEvents || []).sort((a, b) => a.time.localeCompare(b.time));
+        const allClockEventsText = sortedEvents.map(event => `${event.time} ${event.type}`).join('<br>');
+        html += `<tr>`;
+        html += `<td>${rec.date || ''}</td>`;
+        html += `<td>${rec.workStart || ''}</td>`;
+        html += `<td>${rec.workEnd || ''}</td>`;
+        html += `<td>${rec.workingHours ? rec.workingHours + 'h' : ''}</td>`;
+        html += `<td>${rec.breakMinutes ? rec.breakMinutes + '分' : ''}</td>`;
+        html += `<td>${allClockEventsText}</td>`;
+        html += `</tr>`;
+      });
+      html += '</tbody></table>';
+      document.getElementById('attendance').innerHTML = html;
+    }
+  </script>
+</body>
+</html>
