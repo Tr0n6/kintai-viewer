@@ -226,7 +226,12 @@
     <h1>勤怠管理表</h1>
     
     <div id="user-display" class="user-info" style="display: none;">
-      <div class="loading">ユーザー情報を読み込み中</div>
+      <!-- <div class="loading">ユーザー情報を読み込み中</div> -->
+    </div>
+    
+    <div class="controls" style="margin-bottom: 1.5rem; text-align: center;">
+      <label for="month-year-selector" style="margin-right: 8px;">表示月:</label>
+      <select id="month-year-selector" style="padding: 8px; border-radius: 4px; border: 1px solid var(--border-color);"></select>
     </div>
     
     <div id="browser-error" class="browser-error" style="display: none;">
@@ -236,6 +241,12 @@
     
     <div id="attendance"></div>
     <div class="error" id="error"></div>
+    
+    <div class="summary-section" style="margin-top: 1.5rem; padding: 15px; background-color: var(--secondary-color); border-radius: 6px; display: flex; justify-content: space-around;">
+      <div>総労働時間: <span id="total-work-time">-</span></div>
+      <div>総休憩時間: <span id="total-break-time">-</span></div>
+      <div>実働日数: <span id="work-days">-</span></div>
+    </div>
     
     <!-- 問題診断ボタン（通常は非表示） -->
     <div id="debug-section" style="margin-top: 20px; display: none; text-align: center;">
@@ -332,6 +343,29 @@
       });
     });
     
+    // 月年セレクターを生成 (例: 過去12ヶ月)
+    function populateMonthYearSelector() {
+        const select = document.getElementById('month-year-selector');
+        const today = new Date();
+        for (let i = 0; i < 12; i++) {
+            let date = new Date(today.getFullYear(), today.getMonth() - i, 1);
+            let year = date.getFullYear();
+            let month = date.getMonth() + 1;
+            let option = document.createElement('option');
+            option.value = `${year}-${month.toString().padStart(2, '0')}`;
+            option.textContent = `${year}年${month}月`;
+            select.appendChild(option);
+        }
+        // イベントリスナーを追加して、選択が変更されたらデータを再取得
+        select.addEventListener('change', (event) => {
+            const selectedMonthYear = event.target.value;
+            if (currentLineUserId && selectedMonthYear) {
+                const [year, month] = selectedMonthYear.split('-');
+                fetchUserAttendance(currentLineUserId, parseInt(year), parseInt(month));
+            }
+        });
+    }
+    
     // LIFFの初期化
     async function initializeLiff() {
       try {
@@ -381,8 +415,19 @@
           // LINE UserIDを保存（デバッグ用）
           currentLineUserId = lineUserId;
           
-          // 勤怠データを取得
-          await fetchUserAttendance(lineUserId);
+          // 月年セレクターを初期化・設定
+          populateMonthYearSelector(); 
+
+          // 初回データ取得 (セレクターの現在の値に基づいて)
+          const initialSelectedMonthYear = document.getElementById('month-year-selector').value;
+          if (initialSelectedMonthYear) {
+              const [year, month] = initialSelectedMonthYear.split('-');
+              await fetchUserAttendance(lineUserId, parseInt(year), parseInt(month));
+          } else {
+            // フォールバックとして当月データを取得 (セレクターが何らかの理由で空の場合)
+            const today = new Date();
+            await fetchUserAttendance(lineUserId, today.getFullYear(), today.getMonth() + 1);
+          }
           
         } catch (profileError) {
           console.error('プロフィール取得失敗:', profileError);
@@ -403,7 +448,7 @@
     }
     
     // LINE認証での勤怠データ取得
-    async function fetchUserAttendance(lineUserId) {
+    async function fetchUserAttendance(lineUserId, year, month) {
       const attendanceEl = document.getElementById('attendance');
       const errorEl = document.getElementById('error');
       
@@ -411,16 +456,19 @@
         // ローディング表示
         attendanceEl.innerHTML = '<div class="loading">勤怠データを取得中</div>';
         
-        console.log('[DEBUG] fetchUserAttendance - Received lineUserId:', lineUserId);
+        console.log('[DEBUG] fetchUserAttendance - Received lineUserId:', lineUserId, 'Year:', year, 'Month:', month);
 
         if (!lineUserId) {
           console.error('[DEBUG] lineUserId is null or empty. Throwing error.');
           throw new Error('ユーザーIDを取得できませんでした');
         }
         
-        // APIリクエストURLを構築 (複数の形式でパラメータを送信)
-        // 重要: バックエンドが期待する正しいパラメータ名を使用
-        let url = `${API_URL}?userId=${encodeURIComponent(lineUserId)}&lineUserId=${encodeURIComponent(lineUserId)}`;
+        // APIリクエストURLを構築
+        const currentDate = new Date();
+        const requestYear = year || currentDate.getFullYear();
+        const requestMonth = month || (currentDate.getMonth() + 1);
+
+        let url = `${API_URL}?action=getMonthlyAttendance&lineUserId=${encodeURIComponent(lineUserId)}&year=${requestYear}&month=${requestMonth.toString().padStart(2, '0')}`;
         
         // デバッグモードの判定
         const urlParams = new URLSearchParams(window.location.search);
@@ -474,7 +522,7 @@
         if (Array.isArray(data)) {
           if (data.length > 0) {
             console.log('有効なデータを受信しました。表示処理を開始します。');
-            renderTable(data);
+            renderTable(data, requestYear, requestMonth);
           } else {
             // データは配列だが空の場合（勤怠記録なし）
             console.warn('[DEBUG] 勤怠データが空の配列です。LINE UserID:', lineUserId);
@@ -496,7 +544,7 @@
               // データがオブジェクトのプロパティ内にある可能性がある
               if (data.data && Array.isArray(data.data)) {
                 console.log('[DEBUG] data.dataプロパティから配列を取得しました');
-                renderTable(data.data);
+                renderTable(data.data, requestYear, requestMonth);
                 return;
               }
               
@@ -518,7 +566,7 @@
                 
                 if (recordsArray.length > 0) {
                   console.log('[DEBUG] 変換後の配列:', recordsArray);
-                  renderTable(recordsArray);
+                  renderTable(recordsArray, requestYear, requestMonth);
                   return;
                 }
               }
@@ -607,13 +655,17 @@
       errorEl.style.display = 'block';
     }
     
-    function renderTable(records) {
+    function renderTable(records, year, month) {
       const attendanceEl = document.getElementById('attendance');
       
-      console.log('[DEBUG] renderTable - Received records:', JSON.stringify(records, null, 2));
+      console.log('[DEBUG] renderTable - Received records:', JSON.stringify(records, null, 2), 'Year:', year, 'Month:', month);
 
       if (!Array.isArray(records) || records.length === 0) {
-        attendanceEl.innerHTML = '<div class="empty-result">今月の勤怠記録はありません。<br><br>以下の理由が考えられます：<br>・打刻データが登録されていない<br>・LINE UserIDと従業員情報が正しく紐づけられていない<br><br>LINEボットに「出勤」「退勤」などのコマンドを送信して打刻してください。</div>';
+        // 年月の指定がない場合は現在の年月を使用
+        const displayDate = new Date();
+        const displayYear = year || displayDate.getFullYear();
+        const displayMonth = month || (displayDate.getMonth() + 1);
+        attendanceEl.innerHTML = `<div class="empty-result">${displayYear}年${displayMonth}月の勤怠記録はありません。<br><br>以下の理由が考えられます：<br>・打刻データが登録されていない<br>・LINE UserIDと従業員情報が正しく紐づけられていない<br><br>LINEボットに「出勤」「退勤」などのコマンドを送信して打刻してください。</div>`;
         console.warn('[DEBUG] renderTable: 勤怠レコードが空または配列ではありません', records);
         return;
       }
@@ -651,17 +703,21 @@
         return;
       }
       
-      // 現在の年月を取得
-      const now = new Date();
-      const year = now.getFullYear();
-      const month = now.getMonth() + 1;
+      // 現在の年月を取得 (引数で渡されたものを優先)
+      const currentDisplayDate = new Date();
+      const displayYear = year || currentDisplayDate.getFullYear();
+      const displayMonth = month || (currentDisplayDate.getMonth() + 1);
       
-      let html = `<h2>${year}年${month}月の勤怠記録</h2>`;
+      let html = `<h2>${displayYear}年${displayMonth}月の勤怠記録</h2>`;
       html += '<div class="table-container">';
       html += '<table>';
       html += '<thead><tr>';
       html += '<th>日付</th><th>出勤</th><th>退勤</th><th>労働時間</th><th>休憩</th><th>打刻記録</th>';
       html += '</tr></thead><tbody>';
+      
+      let totalWorkSeconds = 0;
+      let totalBreakMinutes = 0;
+      const workDaysSet = new Set();
       
       recordsWithValidation.forEach(rec => {
         // レコードの検証
@@ -699,10 +755,27 @@
         
         let workHoursDisplay = '';
         if (rec.workingHours) {
-          // 8時間以上なら緑、6時間未満なら赤で表示
-          const hours = parseFloat(rec.workingHours);
-          const colorClass = hours >= 8 ? 'text-success' : (hours < 6 ? 'text-danger' : '');
+          // workingHours が HH.mm 形式の場合や、単純な時間数の場合を考慮
+          const hoursMatch = String(rec.workingHours).match(/^(\d+)(?:\.(\d+))?$/);
+          if (hoursMatch) {
+            const hours = parseInt(hoursMatch[1]);
+            const minutesFraction = parseFloat("0." + (hoursMatch[2] || "0")); // 8.5時間などを考慮
+            totalWorkSeconds += hours * 3600 + minutesFraction * 3600; 
+          }
+          const colorClass = parseFloat(rec.workingHours) >= 8 ? 'text-success' : (parseFloat(rec.workingHours) < 6 ? 'text-danger' : '');
           workHoursDisplay = `<span class="${colorClass}">${rec.workingHours}h</span>`;
+        }
+        
+        if (rec.breakMinutes) {
+          const breakM = parseInt(rec.breakMinutes);
+          if (!isNaN(breakM)) {
+            totalBreakMinutes += breakM;
+          }
+        }
+
+        // 実働日数のカウント (出勤記録がある日をカウント)
+        if (rec.workStart) { // workStart があればその日を勤務日とする
+            workDaysSet.add(rec.date);
         }
         
         html += `<tr>`;
@@ -719,6 +792,21 @@
       html += '</div>';
       
       attendanceEl.innerHTML = html;
+
+      // 集計結果の表示
+      const totalWorkHours = Math.floor(totalWorkSeconds / 3600);
+      const totalWorkRemainderMinutes = Math.floor((totalWorkSeconds % 3600) / 60);
+      document.getElementById('total-work-time').textContent = `${totalWorkHours}時間${totalWorkRemainderMinutes}分`;
+
+      const totalBreakHours = Math.floor(totalBreakMinutes / 60);
+      const totalBreakRemainderMinutes = totalBreakMinutes % 60;
+      if (totalBreakHours > 0){
+        document.getElementById('total-break-time').textContent = `${totalBreakHours}時間${totalBreakRemainderMinutes}分`;
+      } else {
+        document.getElementById('total-break-time').textContent = `${totalBreakRemainderMinutes}分`;
+      }
+      
+      document.getElementById('work-days').textContent = `${workDaysSet.size}日`;
     }
     
     // 日付を「MM/DD (曜日)」形式にフォーマット
