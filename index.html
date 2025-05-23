@@ -121,6 +121,16 @@
       font-size: 0.9rem;
     }
     
+    .text-success {
+      color: var(--success-color);
+      font-weight: bold;
+    }
+    
+    .text-danger {
+      color: var(--error-color);
+      font-weight: bold;
+    }
+    
     .browser-error {
       text-align: center;
       padding: 30px 20px;
@@ -164,7 +174,7 @@
   <div class="container">
     <h1>勤怠管理表</h1>
     
-    <div id="user-display" class="user-info">
+    <div id="user-display" class="user-info" style="display: none;">
       <div class="loading">ユーザー情報を読み込み中</div>
     </div>
     
@@ -175,18 +185,35 @@
     
     <div id="attendance"></div>
     <div class="error" id="error"></div>
+    
+    <!-- 問題診断ボタン（通常は非表示） -->
+    <div id="debug-section" style="margin-top: 20px; display: none; text-align: center;">
+      <button id="debug-button" style="padding: 8px 15px; background-color: #f5f5f5; border: 1px solid #ddd; border-radius: 4px;">問題診断</button>
+      <div id="debug-info" style="margin-top: 10px; padding: 10px; border: 1px solid #ddd; border-radius: 4px; background-color: #f9f9f9; display: none; text-align: left; font-size: 0.8rem;"></div>
+    </div>
   </div>
   
   <!-- LIFF SDK -->
   <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
   
   <script>
+    // 最新のAPIエンドポイント
     const API_URL = 'https://script.google.com/macros/s/AKfycbwUnPC4p2vsahxtbS4wizndDoN7KHI5rLRxV10yp_0Y4L4USsPuUrPeq_JET8pGY2cK/exec';
     let isLiffInitialized = false;
     
     // LIFFの初期化
     async function initializeLiff() {
       try {
+        // 開発者モードチェック（クエリパラメータ）
+        const urlParams = new URLSearchParams(window.location.search);
+        const isDevMode = urlParams.get('dev') === 'true';
+        
+        if (isDevMode) {
+          console.log('開発者モード: LIFF初期化をスキップします');
+          await fetchUserAttendance();
+          return;
+        }
+        
         // LINEブラウザチェック
         if (!window.liff) {
           console.error('LIFF SDKが利用できません。LINEアプリで開いてください。');
@@ -222,6 +249,62 @@
       document.getElementById('attendance').style.display = 'none';
     }
     
+    // デバッグ用：テスト表示
+    function renderTestData() {
+      // 現在の年月を取得
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = now.getMonth() + 1;
+      
+      // 今月の1日、2日、3日のデータを作成
+      const day1 = `${year}-${month.toString().padStart(2, '0')}-01`;
+      const day2 = `${year}-${month.toString().padStart(2, '0')}-02`;
+      const day3 = `${year}-${month.toString().padStart(2, '0')}-03`;
+      
+      const testData = [
+        {
+          "date": day1,
+          "clockEvents": [
+            {"type": "出勤", "time": "09:00:00"},
+            {"type": "休憩開始", "time": "12:00:00"},
+            {"type": "休憩終了", "time": "13:00:00"},
+            {"type": "退勤", "time": "18:00:00"}
+          ],
+          "workStart": "09:00:00",
+          "workEnd": "18:00:00",
+          "workingHours": "8.00",
+          "breakMinutes": "60"
+        },
+        {
+          "date": day2,
+          "clockEvents": [
+            {"type": "出勤", "time": "08:30:00"},
+            {"type": "休憩開始", "time": "12:30:00"},
+            {"type": "休憩終了", "time": "13:30:00"},
+            {"type": "退勤", "time": "17:30:00"}
+          ],
+          "workStart": "08:30:00",
+          "workEnd": "17:30:00",
+          "workingHours": "8.00",
+          "breakMinutes": "60"
+        },
+        {
+          "date": day3,
+          "clockEvents": [
+            {"type": "出勤", "time": "10:00:00"},
+            {"type": "休憩開始", "time": "13:00:00"},
+            {"type": "休憩終了", "time": "14:00:00"},
+            {"type": "退勤", "time": "16:00:00"}
+          ],
+          "workStart": "10:00:00",
+          "workEnd": "16:00:00",
+          "workingHours": "5.00",
+          "breakMinutes": "60"
+        }
+      ];
+      renderTable(testData);
+    }
+    
     // ユーザー情報を取得して勤怠データを表示
     async function fetchUserAttendance() {
       const attendanceEl = document.getElementById('attendance');
@@ -229,41 +312,172 @@
       const userDisplayEl = document.getElementById('user-display');
       
       try {
-        // LINEのユーザープロフィールを取得
-        console.log('ユーザープロフィール取得中...');
-        const profile = await liff.getProfile();
-        console.log('プロフィール取得成功:', profile.displayName);
-        const lineUserId = profile.userId;
-        const displayName = profile.displayName;
+        // クエリパラメータからテストモードの判定
+        const urlParams = new URLSearchParams(window.location.search);
+        const isTestMode = urlParams.get('test') === 'true';
+        const isDebugMode = urlParams.get('debug') === 'true';
+        const isDevMode = urlParams.get('dev') === 'true'; // 開発者モード
+        const mockUserId = urlParams.get('mockUserId'); // 開発者テスト用のユーザーID
         
-        // ユーザー情報表示
-        userDisplayEl.innerHTML = `<span class="user-name">${displayName}</span> さんの勤怠情報`;
+        // ユーザー名は表示しない（要件により）
+        userDisplayEl.style.display = 'none';
+        
+        // テストモードの場合はテストデータを表示して終了
+        if (isTestMode) {
+          console.log('テストモード：サンプルデータを表示します');
+          renderTestData();
+          return;
+        }
         
         // ローディング表示
         attendanceEl.innerHTML = '<div class="loading">勤怠データを取得中</div>';
         
-        // APIリクエストURLを構築 (LINE UserIDをパラメータとして送信)
-        const url = `${API_URL}?lineUserId=${encodeURIComponent(lineUserId)}`;
-        console.log('勤怠データ取得URL:', url);
+        let lineUserId;
         
-        // データ取得
-        const res = await fetch(url);
-        const data = await res.json();
-        console.log('勤怠データ受信:', data);
-        
-        // エラーチェック
-        if (data.status === 'error' || data.error) {
-          showError(data.message || data.error || 'データ取得エラー');
-          attendanceEl.innerHTML = '';
-          return;
+        // 開発者モードではLIFF初期化をスキップ
+        if (isDevMode && mockUserId) {
+          console.log('開発者モード: LIFF初期化をスキップしてmockUserIdを使用');
+          lineUserId = mockUserId;
+        } else {
+          // LINEのユーザープロフィールを取得
+          console.log('ユーザープロフィール取得中...');
+          try {
+            const profile = await liff.getProfile();
+            console.log('プロフィール取得成功:', profile.displayName);
+            lineUserId = profile.userId;
+            console.log('取得したLINE UserID:', lineUserId);
+          } catch (profileError) {
+            console.error('プロフィール取得失敗:', profileError);
+            throw new Error('LINEプロフィールの取得に失敗しました: ' + profileError.message);
+          }
         }
         
-        // データが配列かどうかを確認
-        if (Array.isArray(data)) {
-          renderTable(data);
-        } else {
-          console.error('予期しないデータ形式:', data);
-          showError('予期しないデータ形式を受信しました。');
+        if (!lineUserId) {
+          throw new Error('ユーザーIDを取得できませんでした');
+        }
+        
+        // 重要: GASの実装に合わせて正しいAPIパラメータ名を使用
+        // API側は 'lineUserId' ではなく 'userId' としている可能性がある
+        let url = `${API_URL}?userId=${encodeURIComponent(lineUserId)}`;
+        
+        // バックアップとして両方のパラメータ名を送信
+        url += `&lineUserId=${encodeURIComponent(lineUserId)}`;
+        
+        // デバッグモードなら追加パラメータを付与
+        if (isDebugMode) {
+          url += '&debug=true';
+        }
+        
+        console.log('勤怠データ取得URL:', url);
+        
+        try {
+          // データ取得 - タイムアウト10秒
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 10000);
+          
+          const res = await fetch(url, { signal: controller.signal });
+          clearTimeout(timeoutId);
+          
+          if (!res.ok) {
+            console.error('API応答エラー:', res.status, res.statusText);
+            throw new Error(`API応答エラー: ${res.status} ${res.statusText}`);
+          }
+          
+          const textResponse = await res.text();
+          console.log('生のAPIレスポンス:', textResponse);
+          
+          let data;
+          try {
+            data = JSON.parse(textResponse);
+          } catch (parseError) {
+            console.error('JSONパースエラー:', parseError, 'レスポンス:', textResponse);
+            throw new Error('APIからの応答をJSONとして解析できません');
+          }
+          
+          // デバッグ情報 - 取得データの内容と型を詳細に出力
+          console.log('勤怠データ受信 (型):', typeof data);
+          console.log('勤怠データ受信 (配列?):', Array.isArray(data));
+          console.log('勤怠データ受信 (長さ):', Array.isArray(data) ? data.length : 'N/A');
+          console.log('勤怠データ受信 (詳細):', JSON.stringify(data, null, 2));
+          
+          // エラーチェック
+          if (data.status === 'error' || data.error) {
+            console.error('APIエラー:', data);
+            showError(data.message || data.error || 'データ取得エラー');
+            attendanceEl.innerHTML = '';
+            return;
+          }
+          
+          // データが配列かどうかを確認
+          if (Array.isArray(data)) {
+            if (data.length > 0) {
+              console.log('有効なデータを受信しました。表示処理を開始します。');
+              renderTable(data);
+            } else {
+              // データは配列だが空の場合（勤怠記録なし）
+              console.warn('勤怠データが空です。LINE UserID:', lineUserId);
+              
+              // デバッグモードの場合はユーザーIDも表示
+              if (isDebugMode) {
+                attendanceEl.innerHTML = `<div class="empty-result">今月の勤怠記録はありません。<br><br>以下の理由が考えられます：<br>・打刻データが登録されていない<br>・LINE UserIDと従業員情報が正しく紐づけられていない<br><br>あなたのLINE User ID:<br>${lineUserId}</div>`;
+              } else {
+                attendanceEl.innerHTML = '<div class="empty-result">今月の勤怠記録はありません。<br><br>以下の理由が考えられます：<br>・打刻データが登録されていない<br>・LINE UserIDと従業員情報が正しく紐づけられていない<br><br>「出勤」「退勤」などのコマンドをLINEボットに送信して打刻してください。</div>';
+              }
+            }
+          } else {
+            // 配列でない場合、オブジェクトである可能性を確認
+            if (typeof data === 'object' && data !== null) {
+              console.warn('APIから配列ではなくオブジェクトを受信しました:', data);
+              
+              // オブジェクトの可能性がある場合は変換を試みる
+              try {
+                // データがオブジェクトのプロパティ内にある可能性がある
+                if (data.data && Array.isArray(data.data)) {
+                  console.log('data.dataプロパティから配列を取得しました');
+                  renderTable(data.data);
+                  return;
+                }
+                
+                // オブジェクトを配列に変換して表示
+                if (Object.keys(data).length > 0) {
+                  console.log('オブジェクトを配列に変換して表示します');
+                  
+                  // オブジェクトを配列に変換
+                  const recordsArray = Object.entries(data).map(([key, value]) => {
+                    if (typeof value === 'object' && value !== null) {
+                      // キーをdateとして使用する可能性
+                      if (!value.date) {
+                        value.date = key;
+                      }
+                      return value;
+                    }
+                    return null;
+                  }).filter(item => item !== null);
+                  
+                  if (recordsArray.length > 0) {
+                    console.log('変換後の配列:', recordsArray);
+                    renderTable(recordsArray);
+                    return;
+                  }
+                }
+              } catch (conversionError) {
+                console.error('データ変換エラー:', conversionError);
+              }
+            }
+            
+            console.error('予期しないデータ形式:', data);
+            showError('予期しないデータ形式を受信しました。');
+            attendanceEl.innerHTML = '';
+          }
+        } catch (fetchError) {
+          console.error('APIリクエストエラー:', fetchError);
+          
+          if (fetchError.name === 'AbortError') {
+            showError('APIリクエストがタイムアウトしました。ネットワーク接続を確認してください。');
+          } else {
+            showError(`データ取得中にエラーが発生しました: ${fetchError.message}`);
+          }
+          
           attendanceEl.innerHTML = '';
         }
       } catch (err) {
@@ -284,7 +498,41 @@
       const attendanceEl = document.getElementById('attendance');
       
       if (!Array.isArray(records) || records.length === 0) {
-        attendanceEl.innerHTML = '<div class="empty-result">今月の勤怠記録はありません</div>';
+        attendanceEl.innerHTML = '<div class="empty-result">今月の勤怠記録はありません。<br><br>以下の理由が考えられます：<br>・打刻データが登録されていない<br>・LINE UserIDと従業員情報が正しく紐づけられていない<br><br>「出勤」「退勤」などのコマンドをLINEボットに送信して打刻してください。</div>';
+        console.warn('renderTable: 勤怠レコードが空または配列ではありません', records);
+        return;
+      }
+      
+      // デバッグ情報 - レコードの内容を詳細表示
+      console.log('表示するレコード数:', records.length);
+      if (records.length > 0) {
+        console.log('最初のレコードサンプル:', JSON.stringify(records[0], null, 2));
+      }
+      
+      // APIが返すデータ形式を検証
+      const recordsWithValidation = records.map(rec => {
+        // 必須フィールドのチェック
+        if (!rec.date) {
+          console.warn('日付がないレコード:', rec);
+          // 日付を設定
+          if (rec.clockEvents && rec.clockEvents.length > 0 && rec.clockEvents[0].date) {
+            rec.date = rec.clockEvents[0].date;
+            console.log('clockEventsから日付を取得:', rec.date);
+          }
+        }
+        
+        // clockEvents配列のチェック
+        if (!rec.clockEvents || !Array.isArray(rec.clockEvents)) {
+          console.warn('打刻イベントがないか無効なレコード:', rec);
+          rec.clockEvents = [];
+        }
+        
+        return rec;
+      }).filter(rec => rec.date); // 日付がないレコードは除外
+      
+      // 有効なレコードがない場合
+      if (recordsWithValidation.length === 0) {
+        attendanceEl.innerHTML = '<div class="empty-result">有効な勤怠記録が見つかりませんでした。データ形式が正しくないか、勤怠情報がありません。</div>';
         return;
       }
       
@@ -300,9 +548,39 @@
       html += '<th>日付</th><th>出勤</th><th>退勤</th><th>労働時間</th><th>休憩</th><th>打刻記録</th>';
       html += '</tr></thead><tbody>';
       
-      records.forEach(rec => {
-        const sortedEvents = (rec.clockEvents || []).sort((a, b) => a.time.localeCompare(b.time));
-        const allClockEventsText = sortedEvents.map(event => `${event.time} ${event.type}`).join('<br>');
+      recordsWithValidation.forEach(rec => {
+        // レコードの検証
+        if (!rec || typeof rec !== 'object') {
+          console.warn('無効なレコード:', rec);
+          return; // 無効なレコードはスキップ
+        }
+        
+        // 日付フォーマットのチェック
+        const dateDisplay = formatDate(rec.date);
+        
+        // 出退勤時間から時間部分のみ抽出する関数
+        const formatTimeOnly = (timeStr) => {
+          if (!timeStr) return '-';
+          // HH:MM:SS 形式から HH:MM のみ抽出
+          const match = timeStr.match(/^(\d{1,2}:\d{1,2})/);
+          return match ? match[1] : timeStr;
+        };
+        
+        const sortedEvents = (rec.clockEvents || []).sort((a, b) => {
+          if (!a || !a.time) return 1;
+          if (!b || !b.time) return -1;
+          return a.time.localeCompare(b.time);
+        });
+        
+        const allClockEventsText = sortedEvents.map(event => {
+          if (!event || !event.time || !event.type) {
+            console.warn('無効な打刻イベント:', event);
+            return '';
+          }
+          // 時間の表示を短くする
+          const timeOnly = formatTimeOnly(event.time);
+          return `${timeOnly} ${event.type}`;
+        }).filter(text => text).join('<br>');
         
         let workHoursDisplay = '';
         if (rec.workingHours) {
@@ -313,9 +591,9 @@
         }
         
         html += `<tr>`;
-        html += `<td>${formatDate(rec.date)}</td>`;
-        html += `<td class="time-value">${rec.workStart || '-'}</td>`;
-        html += `<td class="time-value">${rec.workEnd || '-'}</td>`;
+        html += `<td>${dateDisplay}</td>`;
+        html += `<td class="time-value">${formatTimeOnly(rec.workStart) || '-'}</td>`;
+        html += `<td class="time-value">${formatTimeOnly(rec.workEnd) || '-'}</td>`;
         html += `<td>${workHoursDisplay || '-'}</td>`;
         html += `<td>${rec.breakMinutes ? rec.breakMinutes + '分' : '-'}</td>`;
         html += `<td class="events-cell">${allClockEventsText || '-'}</td>`;
@@ -345,6 +623,64 @@
     
     // ページ読み込み時にLIFFを初期化
     document.addEventListener('DOMContentLoaded', function() {
+      // クエリパラメータからデバッグモードを確認
+      const urlParams = new URLSearchParams(window.location.search);
+      const isDebugMode = urlParams.get('debug') === 'true';
+      
+      // デバッグモードなら問題診断ボタンを表示
+      if (isDebugMode) {
+        document.getElementById('debug-section').style.display = 'block';
+        
+        // 問題診断ボタンのイベントリスナー
+        document.getElementById('debug-button').addEventListener('click', function() {
+          const debugInfoEl = document.getElementById('debug-info');
+          
+          // システム情報を収集
+          let debugInfo = '';
+          
+          // LIFF情報
+          debugInfo += '<h4>LIFF情報</h4>';
+          debugInfo += `<p>LIFF初期化: ${isLiffInitialized ? '成功' : '未完了'}</p>`;
+          
+          if (window.liff) {
+            try {
+              debugInfo += `<p>LIFF SDK: 利用可能</p>`;
+              debugInfo += `<p>LINEアプリ内: ${liff.isInClient() ? 'はい' : 'いいえ'}</p>`;
+              debugInfo += `<p>ログイン状態: ${liff.isLoggedIn() ? 'ログイン済み' : '未ログイン'}</p>`;
+            } catch (e) {
+              debugInfo += `<p>LIFF情報エラー: ${e.message}</p>`;
+            }
+          } else {
+            debugInfo += `<p>LIFF SDK: 利用不可</p>`;
+          }
+          
+          // ブラウザ情報
+          debugInfo += '<h4>ブラウザ情報</h4>';
+          debugInfo += `<p>User Agent: ${navigator.userAgent}</p>`;
+          
+          // API情報
+          debugInfo += '<h4>API情報</h4>';
+          debugInfo += `<p>エンドポイント: ${API_URL}</p>`;
+          
+          // ユーザーへの指示
+          debugInfo += '<h4>問題解決手順</h4>';
+          debugInfo += '<ol>';
+          debugInfo += '<li>「出勤」や「退勤」などのコマンドをLINEボットに送信して打刻してください</li>';
+          debugInfo += '<li>再度このページにアクセスして勤怠情報を確認してください</li>';
+          debugInfo += '<li>問題が解決しない場合は、管理者に以下の情報を伝えてください：</li>';
+          debugInfo += '</ol>';
+          
+          // 表示/非表示を切り替え
+          if (debugInfoEl.style.display === 'none') {
+            debugInfoEl.innerHTML = debugInfo;
+            debugInfoEl.style.display = 'block';
+          } else {
+            debugInfoEl.style.display = 'none';
+          }
+        });
+      }
+      
+      // LIFF初期化を実行
       initializeLiff().catch(error => {
         console.error('初期化エラー:', error);
         showError('アプリの初期化中にエラーが発生しました。');
