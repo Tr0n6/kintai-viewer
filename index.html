@@ -51,6 +51,7 @@
       padding: 16px;
       border-radius: 6px;
       margin-bottom: 24px;
+      display: none; /* 自動認識モードではフォームを非表示 */
     }
     
     .form-row {
@@ -164,6 +165,29 @@
       font-size: 0.9rem;
     }
     
+    .manual-mode-link {
+      text-align: center;
+      margin-top: 20px;
+      font-size: 0.9rem;
+    }
+    
+    .manual-mode-link a {
+      color: var(--primary-color);
+      text-decoration: none;
+    }
+    
+    .user-info {
+      text-align: center;
+      margin-bottom: 20px;
+      font-size: 0.9rem;
+      color: #666;
+    }
+    
+    .user-name {
+      font-weight: bold;
+      color: var(--primary-color);
+    }
+    
     @media (max-width: 600px) {
       .container {
         padding: 16px 12px;
@@ -184,7 +208,11 @@
   <div class="container">
     <h1>勤怠管理表 簡易ビューア</h1>
     
-    <div class="form-container">
+    <div id="user-display" class="user-info">
+      <div class="loading">ユーザー情報を読み込み中</div>
+    </div>
+    
+    <div class="form-container" id="manual-form">
       <form id="searchForm">
         <div class="form-row">
           <label for="companyPassword">企業パスワード</label>
@@ -200,11 +228,151 @@
     
     <div id="attendance"></div>
     <div class="error" id="error"></div>
+    
+    <div class="manual-mode-link" id="mode-switch">
+      <a href="#" id="switch-mode">手動入力モードに切り替える</a>
+    </div>
   </div>
   
+  <!-- LIFF SDK -->
+  <script charset="utf-8" src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+  
   <script>
-    const API_URL = 'https://script.google.com/macros/s/AKfycbwYVYXmZk1cvCEIes8AKIEzM1UiSVieecBBiJpv2y8S5-9cEpfPifVusOA16G2KM4mr/exec';
+    const API_URL = 'https://script.google.com/macros/s/AKfycbwUnPC4p2vsahxtbS4wizndDoN7KHI5rLRxV10yp_0Y4L4USsPuUrPeq_JET8pGY2cK/exec';
+    let isLiffInitialized = false;
+    let autoMode = true;
     
+    // LIFFの初期化
+    async function initializeLiff() {
+      try {
+        // LIFF IDは実際のものに置き換えてください
+        const LIFF_ID = '2001275389-WBnNz8nX'; // 必要に応じて正しいLIFF IDに変更
+        await liff.init({ liffId: LIFF_ID });
+        isLiffInitialized = true;
+        
+        // LINEブラウザで開かれているか確認
+        if (liff.isInClient()) {
+          autoMode = true;
+          document.getElementById('mode-switch').style.display = 'none';
+          await fetchUserAttendance();
+        } else {
+          // 外部ブラウザでの表示時
+          document.getElementById('mode-switch').style.display = 'block';
+          document.getElementById('switch-mode').textContent = '手動入力モードに切り替える';
+          await fetchUserAttendance();
+        }
+      } catch (err) {
+        console.error('LIFF初期化エラー:', err);
+        showError('LINEの初期化中にエラーが発生しました。通常モードに切り替えます。');
+        switchToManualMode();
+      }
+    }
+    
+    // ユーザー情報を取得して勤怠データを表示
+    async function fetchUserAttendance() {
+      const attendanceEl = document.getElementById('attendance');
+      const errorEl = document.getElementById('error');
+      const userDisplayEl = document.getElementById('user-display');
+      
+      try {
+        if (!isLiffInitialized || !liff.isLoggedIn()) {
+          userDisplayEl.innerHTML = '';
+          switchToManualMode();
+          return;
+        }
+        
+        // LINEのユーザープロフィールを取得
+        const profile = await liff.getProfile();
+        const lineUserId = profile.userId;
+        const displayName = profile.displayName;
+        
+        // ユーザー情報表示
+        userDisplayEl.innerHTML = `<span class="user-name">${displayName}</span> さんの勤怠情報`;
+        
+        // ローディング表示
+        attendanceEl.innerHTML = '<div class="loading">勤怠データを取得中</div>';
+        
+        // APIリクエストURLを構築 (LINE UserIDをパラメータとして送信)
+        const url = `${API_URL}?lineUserId=${encodeURIComponent(lineUserId)}`;
+        
+        // データ取得
+        const res = await fetch(url);
+        const data = await res.json();
+        
+        // エラーチェック
+        if (data.status === 'error' || data.error) {
+          if (data.message === 'ユーザーが見つかりません') {
+            // ユーザーが見つからない場合、手動入力モードに切り替え
+            showError('LINEアカウントが勤怠システムに登録されていません。手動で情報を入力してください。');
+            switchToManualMode();
+          } else {
+            showError(data.message || data.error || 'データ取得エラー');
+            attendanceEl.innerHTML = '';
+          }
+          return;
+        }
+        
+        // データが配列かどうかを確認
+        if (Array.isArray(data)) {
+          renderTable(data);
+        } else {
+          console.error('予期しないデータ形式:', data);
+          showError('予期しないデータ形式を受信しました。');
+          attendanceEl.innerHTML = '';
+        }
+      } catch (err) {
+        console.error('ユーザー情報取得エラー:', err);
+        showError('ユーザー情報の取得中にエラーが発生しました。');
+        attendanceEl.innerHTML = '';
+        switchToManualMode();
+      }
+    }
+    
+    // エラーメッセージ表示
+    function showError(message) {
+      const errorEl = document.getElementById('error');
+      errorEl.textContent = message;
+      errorEl.style.display = 'block';
+    }
+    
+    // 手動入力モードに切り替え
+    function switchToManualMode() {
+      autoMode = false;
+      const userDisplayEl = document.getElementById('user-display');
+      const formContainerEl = document.getElementById('manual-form');
+      const modeSwitchEl = document.getElementById('switch-mode');
+      
+      userDisplayEl.style.display = 'none';
+      formContainerEl.style.display = 'block';
+      modeSwitchEl.textContent = '自動認識モードに切り替える';
+    }
+    
+    // 自動認識モードに切り替え
+    function switchToAutoMode() {
+      autoMode = true;
+      const userDisplayEl = document.getElementById('user-display');
+      const formContainerEl = document.getElementById('manual-form');
+      const modeSwitchEl = document.getElementById('switch-mode');
+      
+      userDisplayEl.style.display = 'block';
+      formContainerEl.style.display = 'none';
+      modeSwitchEl.textContent = '手動入力モードに切り替える';
+      
+      fetchUserAttendance();
+    }
+    
+    // モード切り替えボタンの処理
+    document.getElementById('switch-mode').addEventListener('click', function(e) {
+      e.preventDefault();
+      
+      if (autoMode) {
+        switchToManualMode();
+      } else {
+        switchToAutoMode();
+      }
+    });
+    
+    // 従来の手動フォーム送信処理
     document.getElementById('searchForm').addEventListener('submit', async function(e) {
       e.preventDefault();
       
@@ -220,8 +388,7 @@
       const userId = document.getElementById('userId').value.trim();
       
       if (!password || !userId) {
-        errorEl.textContent = 'パスワードと従業員IDを入力してください。';
-        errorEl.style.display = 'block';
+        showError('パスワードと従業員IDを入力してください。');
         return;
       }
       
@@ -236,8 +403,7 @@
         
         // エラーチェック
         if (data.status === 'error' || data.error) {
-          errorEl.textContent = data.message || data.error || 'データ取得エラー';
-          errorEl.style.display = 'block';
+          showError(data.message || data.error || 'データ取得エラー');
           attendanceEl.innerHTML = '';
           return;
         }
@@ -247,14 +413,12 @@
           renderTable(data);
         } else {
           console.error('予期しないデータ形式:', data);
-          errorEl.textContent = '予期しないデータ形式を受信しました。';
-          errorEl.style.display = 'block';
+          showError('予期しないデータ形式を受信しました。');
           attendanceEl.innerHTML = '';
         }
       } catch (err) {
         console.error('通信エラー:', err);
-        errorEl.textContent = '通信エラー: ' + err;
-        errorEl.style.display = 'block';
+        showError('通信エラー: ' + err);
         attendanceEl.innerHTML = '';
       }
     });
@@ -321,6 +485,9 @@
       
       return `${month}/${day} (${weekday})`;
     }
+    
+    // ページ読み込み時にLIFFを初期化
+    window.onload = initializeLiff;
   </script>
 </body>
 </html>
