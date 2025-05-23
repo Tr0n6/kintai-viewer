@@ -249,7 +249,7 @@
   
   <script>
     // 最新のAPIエンドポイント
-    const API_URL = 'https://script.google.com/macros/s/AKfycbwUnPC4p2vsahxtbS4wizndDoN7KHI5rLRxV10yp_0Y4L4USsPuUrPeq_JET8pGY2cK/exec';
+    const API_URL = 'https://script.google.com/macros/s/AKfycbxCrXq-iEvolakShQ6b55cjxoYRpYqq1Nxl2EYcpRFG1TNYq58vzvBsI9aH3lY7gMM/exec';
     let isLiffInitialized = false;
     let currentLineUserId = null;
     
@@ -411,7 +411,10 @@
         // ローディング表示
         attendanceEl.innerHTML = '<div class="loading">勤怠データを取得中</div>';
         
+        console.log('[DEBUG] fetchUserAttendance - Received lineUserId:', lineUserId);
+
         if (!lineUserId) {
+          console.error('[DEBUG] lineUserId is null or empty. Throwing error.');
           throw new Error('ユーザーIDを取得できませんでした');
         }
         
@@ -426,7 +429,7 @@
           url += '&debug=true';
         }
         
-        console.log('勤怠データ取得URL:', url);
+        console.log('[DEBUG] 勤怠データ取得URL (APIリクエスト):', url);
         
         // データ取得 - タイムアウト10秒
         const controller = new AbortController();
@@ -435,27 +438,29 @@
         const res = await fetch(url, { signal: controller.signal });
         clearTimeout(timeoutId);
         
+        console.log('[DEBUG] API Response Status:', res.status, res.statusText);
+
         if (!res.ok) {
-          console.error('API応答エラー:', res.status, res.statusText);
+          console.error('[DEBUG] API応答エラー。Status:', res.status, 'Text:', res.statusText);
           throw new Error(`API応答エラー: ${res.status} ${res.statusText}`);
         }
         
         const textResponse = await res.text();
-        console.log('生のAPIレスポンス:', textResponse);
+        console.log('[DEBUG] 生のAPIレスポンス (Text):', textResponse);
         
         let data;
         try {
           data = JSON.parse(textResponse);
         } catch (parseError) {
-          console.error('JSONパースエラー:', parseError, 'レスポンス:', textResponse);
+          console.error('[DEBUG] JSONパースエラー:', parseError, 'レスポンス:', textResponse);
           throw new Error('APIからの応答をJSONとして解析できません');
         }
         
         // デバッグ情報 - 取得データの内容と型を詳細に出力
-        console.log('勤怠データ受信 (型):', typeof data);
-        console.log('勤怠データ受信 (配列?):', Array.isArray(data));
-        console.log('勤怠データ受信 (長さ):', Array.isArray(data) ? data.length : 'N/A');
-        console.log('勤怠データ受信 (詳細):', JSON.stringify(data, null, 2));
+        console.log('[DEBUG] 勤怠データ受信 (型):', typeof data);
+        console.log('[DEBUG] 勤怠データ受信 (配列?):', Array.isArray(data));
+        console.log('[DEBUG] 勤怠データ受信 (長さ):', Array.isArray(data) ? data.length : 'N/A');
+        console.log('[DEBUG] 勤怠データ受信 (詳細JSON):', JSON.stringify(data, null, 2));
         
         // エラーチェック
         if (data.status === 'error' || data.error) {
@@ -472,7 +477,7 @@
             renderTable(data);
           } else {
             // データは配列だが空の場合（勤怠記録なし）
-            console.warn('勤怠データが空です。LINE UserID:', lineUserId);
+            console.warn('[DEBUG] 勤怠データが空の配列です。LINE UserID:', lineUserId);
             
             // デバッグモードの場合はユーザーIDも表示
             if (isDebugMode) {
@@ -484,20 +489,20 @@
         } else {
           // 配列でない場合、オブジェクトである可能性を確認
           if (typeof data === 'object' && data !== null) {
-            console.warn('APIから配列ではなくオブジェクトを受信しました:', data);
+            console.warn('[DEBUG] APIから配列ではなくオブジェクトを受信しました:', data);
             
             // オブジェクトの可能性がある場合は変換を試みる
             try {
               // データがオブジェクトのプロパティ内にある可能性がある
               if (data.data && Array.isArray(data.data)) {
-                console.log('data.dataプロパティから配列を取得しました');
+                console.log('[DEBUG] data.dataプロパティから配列を取得しました');
                 renderTable(data.data);
                 return;
               }
               
               // オブジェクトを配列に変換して表示
               if (Object.keys(data).length > 0) {
-                console.log('オブジェクトを配列に変換して表示します');
+                console.log('[DEBUG] オブジェクトを配列に変換して表示します');
                 
                 // オブジェクトを配列に変換
                 const recordsArray = Object.entries(data).map(([key, value]) => {
@@ -512,22 +517,22 @@
                 }).filter(item => item !== null);
                 
                 if (recordsArray.length > 0) {
-                  console.log('変換後の配列:', recordsArray);
+                  console.log('[DEBUG] 変換後の配列:', recordsArray);
                   renderTable(recordsArray);
                   return;
                 }
               }
             } catch (conversionError) {
-              console.error('データ変換エラー:', conversionError);
+              console.error('[DEBUG] データ変換エラー:', conversionError);
             }
           }
           
-          console.error('予期しないデータ形式:', data);
+          console.error('[DEBUG] 予期しないデータ形式:', data);
           showError('予期しないデータ形式を受信しました。');
           attendanceEl.innerHTML = '';
         }
       } catch (fetchError) {
-        console.error('APIリクエストエラー:', fetchError);
+        console.error('[DEBUG] APIリクエスト/処理エラー:', fetchError);
         
         if (fetchError.name === 'AbortError') {
           showError('APIリクエストがタイムアウトしました。ネットワーク接続を確認してください。');
@@ -605,33 +610,35 @@
     function renderTable(records) {
       const attendanceEl = document.getElementById('attendance');
       
+      console.log('[DEBUG] renderTable - Received records:', JSON.stringify(records, null, 2));
+
       if (!Array.isArray(records) || records.length === 0) {
         attendanceEl.innerHTML = '<div class="empty-result">今月の勤怠記録はありません。<br><br>以下の理由が考えられます：<br>・打刻データが登録されていない<br>・LINE UserIDと従業員情報が正しく紐づけられていない<br><br>LINEボットに「出勤」「退勤」などのコマンドを送信して打刻してください。</div>';
-        console.warn('renderTable: 勤怠レコードが空または配列ではありません', records);
+        console.warn('[DEBUG] renderTable: 勤怠レコードが空または配列ではありません', records);
         return;
       }
       
       // デバッグ情報 - レコードの内容を詳細表示
-      console.log('表示するレコード数:', records.length);
+      console.log('[DEBUG] 表示するレコード数:', records.length);
       if (records.length > 0) {
-        console.log('最初のレコードサンプル:', JSON.stringify(records[0], null, 2));
+        console.log('[DEBUG] 最初のレコードサンプル:', JSON.stringify(records[0], null, 2));
       }
       
       // APIが返すデータ形式を検証
       const recordsWithValidation = records.map(rec => {
         // 必須フィールドのチェック
         if (!rec.date) {
-          console.warn('日付がないレコード:', rec);
+          console.warn('[DEBUG] 日付がないレコード:', rec);
           // 日付を設定
           if (rec.clockEvents && rec.clockEvents.length > 0 && rec.clockEvents[0].date) {
             rec.date = rec.clockEvents[0].date;
-            console.log('clockEventsから日付を取得:', rec.date);
+            console.log('[DEBUG] clockEventsから日付を取得:', rec.date);
           }
         }
         
         // clockEvents配列のチェック
         if (!rec.clockEvents || !Array.isArray(rec.clockEvents)) {
-          console.warn('打刻イベントがないか無効なレコード:', rec);
+          console.warn('[DEBUG] 打刻イベントがないか無効なレコード:', rec);
           rec.clockEvents = [];
         }
         
@@ -659,7 +666,7 @@
       recordsWithValidation.forEach(rec => {
         // レコードの検証
         if (!rec || typeof rec !== 'object') {
-          console.warn('無効なレコード:', rec);
+          console.warn('[DEBUG] 無効なレコード:', rec);
           return; // 無効なレコードはスキップ
         }
         
@@ -682,7 +689,7 @@
         
         const allClockEventsText = sortedEvents.map(event => {
           if (!event || !event.time || !event.type) {
-            console.warn('無効な打刻イベント:', event);
+            console.warn('[DEBUG] 無効な打刻イベント:', event);
             return '';
           }
           // 時間の表示を短くする
@@ -718,8 +725,13 @@
     function formatDate(dateStr) {
       if (!dateStr) return '-';
       
+      console.log('[DEBUG] formatDate - input dateStr:', dateStr, typeof dateStr);
+
       const date = new Date(dateStr);
-      if (isNaN(date.getTime())) return dateStr;
+      if (isNaN(date.getTime())) {
+        console.warn('[DEBUG] formatDate - Invalid date string:', dateStr);
+        return dateStr;
+      }
       
       const weekdays = ['日', '月', '火', '水', '木', '金', '土'];
       const month = date.getMonth() + 1;
