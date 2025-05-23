@@ -46,50 +46,6 @@
       font-weight: 600;
     }
     
-    .form-container {
-      background-color: var(--secondary-color);
-      padding: 16px;
-      border-radius: 6px;
-      margin-bottom: 24px;
-      display: block; /* 初期状態では表示 */
-    }
-    
-    .form-row {
-      margin-bottom: 12px;
-    }
-    
-    label {
-      display: inline-block;
-      width: 120px;
-      font-weight: 500;
-      margin-bottom: 4px;
-    }
-    
-    input {
-      padding: 10px;
-      border: 1px solid var(--border-color);
-      border-radius: 4px;
-      width: 100%;
-      font-size: 1rem;
-    }
-    
-    button {
-      background-color: var(--primary-color);
-      color: white;
-      border: none;
-      padding: 10px 16px;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 1rem;
-      transition: background-color 0.2s;
-      width: 100%;
-      margin-top: 8px;
-    }
-    
-    button:hover {
-      background-color: var(--accent-color);
-    }
-    
     #attendance {
       margin-top: 1.5rem;
     }
@@ -165,15 +121,15 @@
       font-size: 0.9rem;
     }
     
-    .manual-mode-link {
+    .browser-error {
       text-align: center;
-      margin-top: 20px;
-      font-size: 0.9rem;
+      padding: 30px 20px;
+      color: var(--error-color);
+      font-weight: bold;
     }
     
-    .manual-mode-link a {
-      color: var(--primary-color);
-      text-decoration: none;
+    .browser-error p {
+      margin-bottom: 10px;
     }
     
     .user-info {
@@ -206,32 +162,19 @@
 </head>
 <body>
   <div class="container">
-    <h1>勤怠管理表 簡易ビューア</h1>
+    <h1>勤怠管理表</h1>
     
     <div id="user-display" class="user-info">
       <div class="loading">ユーザー情報を読み込み中</div>
     </div>
     
-    <div class="form-container" id="manual-form">
-      <form id="searchForm">
-        <div class="form-row">
-          <label for="companyPassword">企業パスワード</label>
-          <input type="password" id="companyPassword" required placeholder="企業パスワードを入力">
-        </div>
-        <div class="form-row">
-          <label for="userId">従業員ID</label>
-          <input type="text" id="userId" required placeholder="従業員IDを入力">
-        </div>
-        <button type="submit">表示する</button>
-      </form>
+    <div id="browser-error" class="browser-error" style="display: none;">
+      <p>このページはLINEアプリからのみアクセスできます。</p>
+      <p>勤怠確認はLINEアプリから行ってください。</p>
     </div>
     
     <div id="attendance"></div>
     <div class="error" id="error"></div>
-    
-    <div class="manual-mode-link" id="mode-switch">
-      <a href="#" id="switch-mode">手動入力モードに切り替える</a>
-    </div>
   </div>
   
   <!-- LIFF SDK -->
@@ -240,58 +183,43 @@
   <script>
     const API_URL = 'https://script.google.com/macros/s/AKfycbwUnPC4p2vsahxtbS4wizndDoN7KHI5rLRxV10yp_0Y4L4USsPuUrPeq_JET8pGY2cK/exec';
     let isLiffInitialized = false;
-    let autoMode = true;
-    
-    // LIFF IDを環境変数として設定（必要に応じて変更してください）
-    const LIFF_ID = ''; // LIFF IDを空にして、自動的に代替モードに切り替わるように
     
     // LIFFの初期化
     async function initializeLiff() {
       try {
-        // LIFF SDKが利用可能かどうかを確認
+        // LINEブラウザチェック
         if (!window.liff) {
-          console.warn('LIFF SDK is not available. Switching to manual mode.');
-          switchToManualMode();
+          console.error('LIFF SDKが利用できません。LINEアプリで開いてください。');
+          showBrowserError();
           return;
         }
         
-        if (!LIFF_ID) {
-          console.warn('LIFF ID is not configured. Switching to manual mode.');
-          showError('LIFFが設定されていないため、手動入力モードに切り替えます。');
-          switchToManualMode();
-          return;
-        }
-        
-        console.log('Initializing LIFF with ID:', LIFF_ID);
-        await liff.init({ liffId: LIFF_ID });
+        // LIFF初期化
+        await liff.init({ liffId: '1657952328-4z9x8DAG' }); // 実際のLIFF IDに置き換えてください
         isLiffInitialized = true;
-        console.log('LIFF initialized successfully');
+        console.log('LIFF初期化成功');
         
         // LINEブラウザで開かれているか確認
-        if (liff.isInClient()) {
-          console.log('Running in LINE browser');
-          autoMode = true;
-          document.getElementById('mode-switch').style.display = 'none';
-          await fetchUserAttendance();
-        } else {
-          // 外部ブラウザでの表示時
-          console.log('Running in external browser');
-          document.getElementById('mode-switch').style.display = 'block';
-          document.getElementById('switch-mode').textContent = '手動入力モードに切り替える';
-          
-          // 外部ブラウザでログインしているか確認
-          if (liff.isLoggedIn()) {
-            await fetchUserAttendance();
-          } else {
-            // 未ログインの場合は手動モードに切り替え
-            switchToManualMode();
-          }
+        if (!liff.isInClient()) {
+          console.error('このページはLINEアプリからのみアクセスできます');
+          showBrowserError();
+          return;
         }
+        
+        // ユーザープロフィールから勤怠データを取得
+        await fetchUserAttendance();
+        
       } catch (err) {
         console.error('LIFF初期化エラー:', err.message, err.stack);
-        showError('LINE連携機能の初期化に失敗しました。手動入力モードで利用できます。');
-        switchToManualMode();
+        showError('LINEへの接続に失敗しました。しばらく経ってからもう一度お試しください。');
       }
+    }
+    
+    // ブラウザエラー表示
+    function showBrowserError() {
+      document.getElementById('user-display').style.display = 'none';
+      document.getElementById('browser-error').style.display = 'block';
+      document.getElementById('attendance').style.display = 'none';
     }
     
     // ユーザー情報を取得して勤怠データを表示
@@ -301,24 +229,10 @@
       const userDisplayEl = document.getElementById('user-display');
       
       try {
-        if (!isLiffInitialized) {
-          console.warn('LIFF is not initialized.');
-          userDisplayEl.innerHTML = '';
-          switchToManualMode();
-          return;
-        }
-        
-        if (!liff.isLoggedIn()) {
-          console.warn('User is not logged in.');
-          userDisplayEl.innerHTML = '';
-          switchToManualMode();
-          return;
-        }
-        
         // LINEのユーザープロフィールを取得
-        console.log('Fetching user profile...');
+        console.log('ユーザープロフィール取得中...');
         const profile = await liff.getProfile();
-        console.log('Profile fetched:', profile.displayName);
+        console.log('プロフィール取得成功:', profile.displayName);
         const lineUserId = profile.userId;
         const displayName = profile.displayName;
         
@@ -330,114 +244,12 @@
         
         // APIリクエストURLを構築 (LINE UserIDをパラメータとして送信)
         const url = `${API_URL}?lineUserId=${encodeURIComponent(lineUserId)}`;
-        console.log('Fetching attendance data from:', url);
+        console.log('勤怠データ取得URL:', url);
         
         // データ取得
         const res = await fetch(url);
         const data = await res.json();
-        console.log('Attendance data received:', data);
-        
-        // エラーチェック
-        if (data.status === 'error' || data.error) {
-          if (data.message === 'ユーザーが見つかりません') {
-            // ユーザーが見つからない場合、手動入力モードに切り替え
-            showError('LINEアカウントが勤怠システムに登録されていません。手動で情報を入力してください。');
-            switchToManualMode();
-          } else {
-            showError(data.message || data.error || 'データ取得エラー');
-            attendanceEl.innerHTML = '';
-          }
-          return;
-        }
-        
-        // データが配列かどうかを確認
-        if (Array.isArray(data)) {
-          renderTable(data);
-        } else {
-          console.error('予期しないデータ形式:', data);
-          showError('予期しないデータ形式を受信しました。');
-          attendanceEl.innerHTML = '';
-        }
-      } catch (err) {
-        console.error('ユーザー情報取得エラー:', err.message, err.stack);
-        showError('ユーザー情報の取得中にエラーが発生しました。');
-        attendanceEl.innerHTML = '';
-        switchToManualMode();
-      }
-    }
-    
-    // エラーメッセージ表示
-    function showError(message) {
-      const errorEl = document.getElementById('error');
-      errorEl.textContent = message;
-      errorEl.style.display = 'block';
-    }
-    
-    // 手動入力モードに切り替え
-    function switchToManualMode() {
-      autoMode = false;
-      const userDisplayEl = document.getElementById('user-display');
-      const formContainerEl = document.getElementById('manual-form');
-      const modeSwitchEl = document.getElementById('switch-mode');
-      
-      userDisplayEl.style.display = 'none';
-      formContainerEl.style.display = 'block';
-      modeSwitchEl.textContent = '自動認識モードに切り替える';
-    }
-    
-    // 自動認識モードに切り替え
-    function switchToAutoMode() {
-      autoMode = true;
-      const userDisplayEl = document.getElementById('user-display');
-      const formContainerEl = document.getElementById('manual-form');
-      const modeSwitchEl = document.getElementById('switch-mode');
-      
-      userDisplayEl.style.display = 'block';
-      formContainerEl.style.display = 'none';
-      modeSwitchEl.textContent = '手動入力モードに切り替える';
-      
-      fetchUserAttendance();
-    }
-    
-    // モード切り替えボタンの処理
-    document.getElementById('switch-mode').addEventListener('click', function(e) {
-      e.preventDefault();
-      
-      if (autoMode) {
-        switchToManualMode();
-      } else {
-        switchToAutoMode();
-      }
-    });
-    
-    // 従来の手動フォーム送信処理
-    document.getElementById('searchForm').addEventListener('submit', async function(e) {
-      e.preventDefault();
-      
-      const attendanceEl = document.getElementById('attendance');
-      const errorEl = document.getElementById('error');
-      
-      // リセット
-      attendanceEl.innerHTML = '';
-      errorEl.style.display = 'none';
-      errorEl.textContent = '';
-      
-      const password = document.getElementById('companyPassword').value.trim();
-      const userId = document.getElementById('userId').value.trim();
-      
-      if (!password || !userId) {
-        showError('パスワードと従業員IDを入力してください。');
-        return;
-      }
-      
-      try {
-        const url = `${API_URL}?password=${encodeURIComponent(password)}&userId=${encodeURIComponent(userId)}`;
-        
-        // ローディング表示
-        attendanceEl.innerHTML = '<div class="loading">データを取得中</div>';
-        
-        const res = await fetch(url);
-        const data = await res.json();
+        console.log('勤怠データ受信:', data);
         
         // エラーチェック
         if (data.status === 'error' || data.error) {
@@ -455,11 +267,18 @@
           attendanceEl.innerHTML = '';
         }
       } catch (err) {
-        console.error('通信エラー:', err);
-        showError('通信エラー: ' + err);
+        console.error('ユーザー情報取得エラー:', err.message, err.stack);
+        showError('ユーザー情報の取得中にエラーが発生しました。');
         attendanceEl.innerHTML = '';
       }
-    });
+    }
+    
+    // エラーメッセージ表示
+    function showError(message) {
+      const errorEl = document.getElementById('error');
+      errorEl.textContent = message;
+      errorEl.style.display = 'block';
+    }
     
     function renderTable(records) {
       const attendanceEl = document.getElementById('attendance');
@@ -524,25 +343,11 @@
       return `${month}/${day} (${weekday})`;
     }
     
-    // ページロード時の初期化
+    // ページ読み込み時にLIFFを初期化
     document.addEventListener('DOMContentLoaded', function() {
-      // 初期化時にエラーが発生しても手動入力フォームが表示されるようにする
-      const userDisplayEl = document.getElementById('user-display');
-      
-      if (!window.liff || !LIFF_ID) {
-        console.log('LIFF not available or LIFF ID not set. Switching to manual mode.');
-        userDisplayEl.style.display = 'none';
-        document.getElementById('manual-form').style.display = 'block';
-        document.getElementById('mode-switch').style.display = 'none';
-        return;
-      }
-      
-      // LIFFの初期化を試行
       initializeLiff().catch(error => {
-        console.error('LIFF initialization failed:', error);
-        userDisplayEl.style.display = 'none';
-        document.getElementById('manual-form').style.display = 'block';
-        document.getElementById('mode-switch').style.display = 'none';
+        console.error('初期化エラー:', error);
+        showError('アプリの初期化中にエラーが発生しました。');
       });
     });
   </script>
