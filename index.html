@@ -51,7 +51,7 @@
       padding: 16px;
       border-radius: 6px;
       margin-bottom: 24px;
-      display: none; /* 自動認識モードではフォームを非表示 */
+      display: block; /* 初期状態では表示 */
     }
     
     .form-row {
@@ -242,28 +242,54 @@
     let isLiffInitialized = false;
     let autoMode = true;
     
+    // LIFF IDを環境変数として設定（必要に応じて変更してください）
+    const LIFF_ID = ''; // LIFF IDを空にして、自動的に代替モードに切り替わるように
+    
     // LIFFの初期化
     async function initializeLiff() {
       try {
-        // LIFF IDは実際のものに置き換えてください
-        const LIFF_ID = '2001275389-WBnNz8nX'; // 必要に応じて正しいLIFF IDに変更
+        // LIFF SDKが利用可能かどうかを確認
+        if (!window.liff) {
+          console.warn('LIFF SDK is not available. Switching to manual mode.');
+          switchToManualMode();
+          return;
+        }
+        
+        if (!LIFF_ID) {
+          console.warn('LIFF ID is not configured. Switching to manual mode.');
+          showError('LIFFが設定されていないため、手動入力モードに切り替えます。');
+          switchToManualMode();
+          return;
+        }
+        
+        console.log('Initializing LIFF with ID:', LIFF_ID);
         await liff.init({ liffId: LIFF_ID });
         isLiffInitialized = true;
+        console.log('LIFF initialized successfully');
         
         // LINEブラウザで開かれているか確認
         if (liff.isInClient()) {
+          console.log('Running in LINE browser');
           autoMode = true;
           document.getElementById('mode-switch').style.display = 'none';
           await fetchUserAttendance();
         } else {
           // 外部ブラウザでの表示時
+          console.log('Running in external browser');
           document.getElementById('mode-switch').style.display = 'block';
           document.getElementById('switch-mode').textContent = '手動入力モードに切り替える';
-          await fetchUserAttendance();
+          
+          // 外部ブラウザでログインしているか確認
+          if (liff.isLoggedIn()) {
+            await fetchUserAttendance();
+          } else {
+            // 未ログインの場合は手動モードに切り替え
+            switchToManualMode();
+          }
         }
       } catch (err) {
-        console.error('LIFF初期化エラー:', err);
-        showError('LINEの初期化中にエラーが発生しました。通常モードに切り替えます。');
+        console.error('LIFF初期化エラー:', err.message, err.stack);
+        showError('LINE連携機能の初期化に失敗しました。手動入力モードで利用できます。');
         switchToManualMode();
       }
     }
@@ -275,14 +301,24 @@
       const userDisplayEl = document.getElementById('user-display');
       
       try {
-        if (!isLiffInitialized || !liff.isLoggedIn()) {
+        if (!isLiffInitialized) {
+          console.warn('LIFF is not initialized.');
+          userDisplayEl.innerHTML = '';
+          switchToManualMode();
+          return;
+        }
+        
+        if (!liff.isLoggedIn()) {
+          console.warn('User is not logged in.');
           userDisplayEl.innerHTML = '';
           switchToManualMode();
           return;
         }
         
         // LINEのユーザープロフィールを取得
+        console.log('Fetching user profile...');
         const profile = await liff.getProfile();
+        console.log('Profile fetched:', profile.displayName);
         const lineUserId = profile.userId;
         const displayName = profile.displayName;
         
@@ -294,10 +330,12 @@
         
         // APIリクエストURLを構築 (LINE UserIDをパラメータとして送信)
         const url = `${API_URL}?lineUserId=${encodeURIComponent(lineUserId)}`;
+        console.log('Fetching attendance data from:', url);
         
         // データ取得
         const res = await fetch(url);
         const data = await res.json();
+        console.log('Attendance data received:', data);
         
         // エラーチェック
         if (data.status === 'error' || data.error) {
@@ -321,7 +359,7 @@
           attendanceEl.innerHTML = '';
         }
       } catch (err) {
-        console.error('ユーザー情報取得エラー:', err);
+        console.error('ユーザー情報取得エラー:', err.message, err.stack);
         showError('ユーザー情報の取得中にエラーが発生しました。');
         attendanceEl.innerHTML = '';
         switchToManualMode();
@@ -486,8 +524,27 @@
       return `${month}/${day} (${weekday})`;
     }
     
-    // ページ読み込み時にLIFFを初期化
-    window.onload = initializeLiff;
+    // ページロード時の初期化
+    document.addEventListener('DOMContentLoaded', function() {
+      // 初期化時にエラーが発生しても手動入力フォームが表示されるようにする
+      const userDisplayEl = document.getElementById('user-display');
+      
+      if (!window.liff || !LIFF_ID) {
+        console.log('LIFF not available or LIFF ID not set. Switching to manual mode.');
+        userDisplayEl.style.display = 'none';
+        document.getElementById('manual-form').style.display = 'block';
+        document.getElementById('mode-switch').style.display = 'none';
+        return;
+      }
+      
+      // LIFFの初期化を試行
+      initializeLiff().catch(error => {
+        console.error('LIFF initialization failed:', error);
+        userDisplayEl.style.display = 'none';
+        document.getElementById('manual-form').style.display = 'block';
+        document.getElementById('mode-switch').style.display = 'none';
+      });
+    });
   </script>
 </body>
 </html>
