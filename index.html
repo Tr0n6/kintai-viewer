@@ -265,7 +265,7 @@
   
   <script>
     // 最新のAPIエンドポイント（更新済み）
-    const API_URL = 'https://script.google.com/macros/s/AKfycbxZ6QpX3xIw6hV0WyqUlKaspWXmgeApPAQNM3cn6RCX4CIJFgFpHKB3xeX9Z_Jfskhi/exec';
+    const API_URL = 'https://script.google.com/macros/s/AKfycbyA1TsoVJJyq65S3Xel12Utav836mRrSVpYH51mx7Mv88VRDs-EFNsJLGGK-Id_v4Bj/exec';
     let isLiffInitialized = false;
     let currentLineUserId = null;
     
@@ -330,6 +330,11 @@
           if (currentLineUserId) {
             debugInfo += '<h4>LINE情報</h4>';
             debugInfo += `<p>LINE User ID: ${currentLineUserId}</p>`;
+            
+            // テスト用URLを生成
+            const testDevUrl = `${window.location.origin}${window.location.pathname}?dev=true&mockUserId=${encodeURIComponent(currentLineUserId)}`;
+            debugInfo += `<p>開発者モードURL: <a href="${testDevUrl}" target="_blank">${testDevUrl}</a></p>`;
+            debugInfo += `<p>※このURLを共有することで、他のブラウザからもテストできます</p>`;
           }
           
           // API接続テスト
@@ -657,17 +662,41 @@ fetch('${API_URL}?action=ping').then(r=>r.text()).then(console.log).catch(consol
             clearTimeout(timeoutId);
             requestCompleted = true;
             
-            if (data && Array.isArray(data)) {
-              console.log(`[DEBUG] データ受信成功: ${data.length}件`);
-              renderTable(data, requestYear, requestMonth);
-            } else if (data && data.status === 'error') {
-              console.error('[DEBUG] APIエラー:', data.message);
-              showError(data.message || 'データの取得に失敗しました');
-              attendanceEl.innerHTML = `<div class="empty-result">サーバーからエラーが返されました。<br>${data.message || '不明なエラー'}</div>`;
-            } else {
-              console.error('[DEBUG] 不正なデータ形式:', data);
-              showError('サーバーから不正なデータが返されました');
-              attendanceEl.innerHTML = '<div class="empty-result">データ形式が不正です。<br>管理者にお問い合わせください。</div>';
+            try {
+              if (data && Array.isArray(data)) {
+                console.log(`[DEBUG] データ受信成功: ${data.length}件`);
+                
+                // データの形式チェック（時間フィールドの存在確認）
+                let validData = true;
+                if (data.length > 0) {
+                  for (const record of data) {
+                    if (record.clockEvents && Array.isArray(record.clockEvents)) {
+                      for (const event of record.clockEvents) {
+                        if (event && (!event.time || typeof event.time !== 'string')) {
+                          console.warn('[DEBUG] 無効な時間データ:', event);
+                          // 無効なデータを修正
+                          event.time = event.time ? String(event.time) : '';
+                        }
+                      }
+                    }
+                  }
+                }
+                
+                // データのレンダリング
+                renderTable(data, requestYear, requestMonth);
+              } else if (data && data.status === 'error') {
+                console.error('[DEBUG] APIエラー:', data.message);
+                showError(data.message || 'データの取得に失敗しました');
+                attendanceEl.innerHTML = `<div class="empty-result">サーバーからエラーが返されました。<br>${data.message || '不明なエラー'}</div>`;
+              } else {
+                console.error('[DEBUG] 不正なデータ形式:', data);
+                showError('サーバーから不正なデータが返されました');
+                attendanceEl.innerHTML = '<div class="empty-result">データ形式が不正です。<br>管理者にお問い合わせください。</div>';
+              }
+            } catch (err) {
+              console.error('[DEBUG] データ処理エラー:', err);
+              showError(`データ処理中にエラーが発生しました: ${err.message}`);
+              attendanceEl.innerHTML = '<div class="empty-result">データ処理中にエラーが発生しました。<br>しばらく経ってから再度お試しください。</div>';
             }
             
             // コールバック関数を削除（メモリリーク防止）
@@ -813,136 +842,153 @@ fetch('${API_URL}?action=ping').then(r=>r.text()).then(console.log).catch(consol
         return;
       }
       
-      // レコード数を確認
-      
-      // APIが返すデータ形式を検証
-      const recordsWithValidation = records.map(rec => {
-        // 必須フィールドのチェック
-        if (!rec.date) {
-          // 日付を設定
-          if (rec.clockEvents && rec.clockEvents.length > 0 && rec.clockEvents[0].date) {
-            rec.date = rec.clockEvents[0].date;
+      try {
+        // APIが返すデータ形式を検証
+        const recordsWithValidation = records.map(rec => {
+          // 必須フィールドのチェック
+          if (!rec.date) {
+            // 日付を設定
+            if (rec.clockEvents && rec.clockEvents.length > 0 && rec.clockEvents[0].date) {
+              rec.date = rec.clockEvents[0].date;
+            }
           }
+          
+          // clockEvents配列のチェック
+          if (!rec.clockEvents || !Array.isArray(rec.clockEvents)) {
+            rec.clockEvents = [];
+          } else {
+            // 各イベントのデータ型を確認・修正
+            rec.clockEvents = rec.clockEvents.map(event => {
+              if (!event) return { type: '不明', time: '' };
+              if (!event.type) event.type = '不明';
+              if (!event.time || typeof event.time !== 'string') {
+                event.time = event.time ? String(event.time) : '';
+              }
+              return event;
+            });
+            
+            // 時間順にソート（安全に）
+            rec.clockEvents.sort((a, b) => {
+              if (!a || !a.time) return 1; 
+              if (!b || !b.time) return -1;
+              return String(a.time).localeCompare(String(b.time));
+            });
+          }
+          
+          return rec;
+        }).filter(rec => rec.date); // 日付がないレコードは除外
+        
+        // 有効なレコードがない場合
+        if (recordsWithValidation.length === 0) {
+          attendanceEl.innerHTML = '<div class="empty-result">有効な勤怠記録が見つかりませんでした。データ形式が正しくないか、勤怠情報がありません。</div>';
+          return;
         }
         
-        // clockEvents配列のチェック
-        if (!rec.clockEvents || !Array.isArray(rec.clockEvents)) {
-          rec.clockEvents = [];
-        }
+        // 現在の年月を取得 (引数で渡されたものを優先)
+        const currentDisplayDate = new Date();
+        const displayYear = year || currentDisplayDate.getFullYear();
+        const displayMonth = month || (currentDisplayDate.getMonth() + 1);
         
-        return rec;
-      }).filter(rec => rec.date); // 日付がないレコードは除外
-      
-      // 有効なレコードがない場合
-      if (recordsWithValidation.length === 0) {
-        attendanceEl.innerHTML = '<div class="empty-result">有効な勤怠記録が見つかりませんでした。データ形式が正しくないか、勤怠情報がありません。</div>';
-        return;
-      }
-      
-      // 現在の年月を取得 (引数で渡されたものを優先)
-      const currentDisplayDate = new Date();
-      const displayYear = year || currentDisplayDate.getFullYear();
-      const displayMonth = month || (currentDisplayDate.getMonth() + 1);
-      
-      let html = `<h2>${displayYear}年${displayMonth}月の勤怠記録</h2>`;
-      html += '<div class="table-container">';
-      html += '<table>';
-      html += '<thead><tr>';
-      html += '<th>日付</th><th>出勤</th><th>退勤</th><th>労働時間</th><th>休憩</th><th>打刻記録</th>';
-      html += '</tr></thead><tbody>';
-      
-      let totalWorkSeconds = 0;
-      let totalBreakMinutes = 0;
-      const workDaysSet = new Set();
-      
-      recordsWithValidation.forEach(rec => {
-        // レコードの検証
-        if (!rec || typeof rec !== 'object') {
-          console.warn('[DEBUG] 無効なレコード:', rec);
-          return; // 無効なレコードはスキップ
-        }
+        let html = `<h2>${displayYear}年${displayMonth}月の勤怠記録</h2>`;
+        html += '<div class="table-container">';
+        html += '<table>';
+        html += '<thead><tr>';
+        html += '<th>日付</th><th>出勤</th><th>退勤</th><th>労働時間</th><th>休憩</th><th>打刻記録</th>';
+        html += '</tr></thead><tbody>';
         
-        // 日付フォーマットのチェック
-        const dateDisplay = formatDate(rec.date);
+        let totalWorkSeconds = 0;
+        let totalBreakMinutes = 0;
+        const workDaysSet = new Set();
         
-        // 出退勤時間から時間部分のみ抽出する関数
-        const formatTimeOnly = (timeStr) => {
-          if (!timeStr) return '-';
-          // HH:MM:SS 形式から HH:MM のみ抽出
-          const match = timeStr.match(/^(\d{1,2}:\d{1,2})/);
-          return match ? match[1] : timeStr;
-        };
-        
-        const sortedEvents = (rec.clockEvents || []).sort((a, b) => {
-          if (!a || !a.time) return 1;
-          if (!b || !b.time) return -1;
-          return a.time.localeCompare(b.time);
+        recordsWithValidation.forEach(rec => {
+          // レコードの検証
+          if (!rec || typeof rec !== 'object') {
+            console.warn('[DEBUG] 無効なレコード:', rec);
+            return; // 無効なレコードはスキップ
+          }
+          
+          // 日付フォーマットのチェック
+          const dateDisplay = formatDate(rec.date);
+          
+          // 出退勤時間から時間部分のみ抽出する関数
+          const formatTimeOnly = (timeStr) => {
+            if (!timeStr) return '-';
+            // HH:MM:SS 形式から HH:MM のみ抽出
+            const match = String(timeStr).match(/^(\d{1,2}:\d{1,2})/);
+            return match ? match[1] : timeStr;
+          };
+          
+          const sortedEvents = (rec.clockEvents || []);
+          
+          const allClockEventsText = sortedEvents.map(event => {
+            if (!event || !event.time || !event.type) {
+              console.warn('[DEBUG] 無効な打刻イベント:', event);
+              return '';
+            }
+            // 時間の表示を短くする
+            const timeOnly = formatTimeOnly(event.time);
+            return `${timeOnly} ${event.type}`;
+          }).filter(text => text).join('<br>');
+          
+          let workHoursDisplay = '';
+          if (rec.workingHours) {
+            // workingHours が HH.mm 形式の場合や、単純な時間数の場合を考慮
+            const hoursMatch = String(rec.workingHours).match(/^(\d+)(?:\.(\d+))?$/);
+            if (hoursMatch) {
+              const hours = parseInt(hoursMatch[1]);
+              const minutesFraction = parseFloat("0." + (hoursMatch[2] || "0")); // 8.5時間などを考慮
+              totalWorkSeconds += hours * 3600 + minutesFraction * 3600; 
+            }
+            const colorClass = parseFloat(rec.workingHours) >= 8 ? 'text-success' : (parseFloat(rec.workingHours) < 6 ? 'text-danger' : '');
+            workHoursDisplay = `<span class="${colorClass}">${rec.workingHours}h</span>`;
+          }
+          
+          if (rec.breakMinutes) {
+            const breakM = parseInt(rec.breakMinutes);
+            if (!isNaN(breakM)) {
+              totalBreakMinutes += breakM;
+            }
+          }
+
+          // 実働日数のカウント (出勤記録がある日をカウント)
+          if (rec.workStart) { // workStart があればその日を勤務日とする
+              workDaysSet.add(rec.date);
+          }
+          
+          html += `<tr>`;
+          html += `<td>${dateDisplay}</td>`;
+          html += `<td class="time-value">${formatTimeOnly(rec.workStart) || '-'}</td>`;
+          html += `<td class="time-value">${formatTimeOnly(rec.workEnd) || '-'}</td>`;
+          html += `<td>${workHoursDisplay || '-'}</td>`;
+          html += `<td>${rec.breakMinutes ? rec.breakMinutes + '分' : '-'}</td>`;
+          html += `<td class="events-cell">${allClockEventsText || '-'}</td>`;
+          html += `</tr>`;
         });
         
-        const allClockEventsText = sortedEvents.map(event => {
-          if (!event || !event.time || !event.type) {
-            console.warn('[DEBUG] 無効な打刻イベント:', event);
-            return '';
-          }
-          // 時間の表示を短くする
-          const timeOnly = formatTimeOnly(event.time);
-          return `${timeOnly} ${event.type}`;
-        }).filter(text => text).join('<br>');
+        html += '</tbody></table>';
+        html += '</div>';
         
-        let workHoursDisplay = '';
-        if (rec.workingHours) {
-          // workingHours が HH.mm 形式の場合や、単純な時間数の場合を考慮
-          const hoursMatch = String(rec.workingHours).match(/^(\d+)(?:\.(\d+))?$/);
-          if (hoursMatch) {
-            const hours = parseInt(hoursMatch[1]);
-            const minutesFraction = parseFloat("0." + (hoursMatch[2] || "0")); // 8.5時間などを考慮
-            totalWorkSeconds += hours * 3600 + minutesFraction * 3600; 
-          }
-          const colorClass = parseFloat(rec.workingHours) >= 8 ? 'text-success' : (parseFloat(rec.workingHours) < 6 ? 'text-danger' : '');
-          workHoursDisplay = `<span class="${colorClass}">${rec.workingHours}h</span>`;
+        attendanceEl.innerHTML = html;
+
+        // 集計結果の表示
+        const totalWorkHours = Math.floor(totalWorkSeconds / 3600);
+        const totalWorkRemainderMinutes = Math.floor((totalWorkSeconds % 3600) / 60);
+        document.getElementById('total-work-time').textContent = `${totalWorkHours}時間${totalWorkRemainderMinutes}分`;
+
+        const totalBreakHours = Math.floor(totalBreakMinutes / 60);
+        const totalBreakRemainderMinutes = totalBreakMinutes % 60;
+        if (totalBreakHours > 0){
+          document.getElementById('total-break-time').textContent = `${totalBreakHours}時間${totalBreakRemainderMinutes}分`;
+        } else {
+          document.getElementById('total-break-time').textContent = `${totalBreakRemainderMinutes}分`;
         }
         
-        if (rec.breakMinutes) {
-          const breakM = parseInt(rec.breakMinutes);
-          if (!isNaN(breakM)) {
-            totalBreakMinutes += breakM;
-          }
-        }
-
-        // 実働日数のカウント (出勤記録がある日をカウント)
-        if (rec.workStart) { // workStart があればその日を勤務日とする
-            workDaysSet.add(rec.date);
-        }
-        
-        html += `<tr>`;
-        html += `<td>${dateDisplay}</td>`;
-        html += `<td class="time-value">${formatTimeOnly(rec.workStart) || '-'}</td>`;
-        html += `<td class="time-value">${formatTimeOnly(rec.workEnd) || '-'}</td>`;
-        html += `<td>${workHoursDisplay || '-'}</td>`;
-        html += `<td>${rec.breakMinutes ? rec.breakMinutes + '分' : '-'}</td>`;
-        html += `<td class="events-cell">${allClockEventsText || '-'}</td>`;
-        html += `</tr>`;
-      });
-      
-      html += '</tbody></table>';
-      html += '</div>';
-      
-      attendanceEl.innerHTML = html;
-
-      // 集計結果の表示
-      const totalWorkHours = Math.floor(totalWorkSeconds / 3600);
-      const totalWorkRemainderMinutes = Math.floor((totalWorkSeconds % 3600) / 60);
-      document.getElementById('total-work-time').textContent = `${totalWorkHours}時間${totalWorkRemainderMinutes}分`;
-
-      const totalBreakHours = Math.floor(totalBreakMinutes / 60);
-      const totalBreakRemainderMinutes = totalBreakMinutes % 60;
-      if (totalBreakHours > 0){
-        document.getElementById('total-break-time').textContent = `${totalBreakHours}時間${totalBreakRemainderMinutes}分`;
-      } else {
-        document.getElementById('total-break-time').textContent = `${totalBreakRemainderMinutes}分`;
+        document.getElementById('work-days').textContent = `${workDaysSet.size}日`;
+      } catch (error) {
+        console.error('[DEBUG] 予期しないエラー:', error);
+        showError(`データ処理中にエラーが発生しました`);
+        attendanceEl.innerHTML = '<div class="empty-result">予期しないエラーが発生しました。<br>しばらく経ってから再度お試しください。</div>';
       }
-      
-      document.getElementById('work-days').textContent = `${workDaysSet.size}日`;
     }
     
     // 日付を「MM/DD (曜日)」形式にフォーマット
