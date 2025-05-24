@@ -252,7 +252,8 @@
     
     <!-- 問題診断ボタン（通常は非表示） -->
     <div id="debug-section" style="margin-top: 20px; display: none; text-align: center;">
-      <button id="debug-button" style="padding: 8px 15px; background-color: #f5f5f5; border: 1px solid #ddd; border-radius: 4px;">問題診断</button>
+      <button id="debug-button" style="padding: 8px 15px; background-color: #f5f5f5; border: 1px solid #ddd; border-radius: 4px; margin-right: 10px;">問題診断</button>
+      <button id="test-data-button" style="padding: 8px 15px; background-color: #e8f4ff; border: 1px solid #cce4ff; border-radius: 4px;">テストデータ表示</button>
       <div id="debug-info" style="margin-top: 10px; padding: 10px; border: 1px solid #ddd; border-radius: 4px; background-color: #f9f9f9; display: none; text-align: left; font-size: 0.8rem;"></div>
     </div>
   </div>
@@ -273,70 +274,112 @@
       const isDebugMode = urlParams.get('debug') === 'true';
       const isTestMode = urlParams.get('test') === 'true';
       
-      // テストモードの場合はテストデータを表示
+      // テストモードの場合はテストデータを表示（年月指定も考慮）
       if (isTestMode) {
         console.log('テストモード：サンプルデータを表示します');
-        renderTestData();
+        
+        // 月年セレクターを初期化
+        populateMonthYearSelector();
+        
+        // URLパラメータから年月を取得（指定があれば）
+        const testYear = urlParams.get('year');
+        const testMonth = urlParams.get('month');
+        
+        if (testYear && testMonth) {
+          console.log(`テストモード: 指定年月 ${testYear}年${testMonth}月のデータを表示します`);
+          renderTestData(parseInt(testYear), parseInt(testMonth));
+        } else {
+          // デフォルトは現在の年月
+          renderTestData();
+        }
+        
+        // デバッグセクションを表示
+        document.getElementById('debug-section').style.display = 'block';
         return;
       }
       
-      // デバッグモードなら問題診断ボタンを表示
-      if (isDebugMode) {
-        document.getElementById('debug-section').style.display = 'block';
-        
-        // 問題診断ボタンのイベントリスナー
-        document.getElementById('debug-button').addEventListener('click', function() {
-          const debugInfoEl = document.getElementById('debug-info');
+              // デバッグモードなら問題診断ボタンとテストデータボタンを表示
+        if (isDebugMode) {
+          document.getElementById('debug-section').style.display = 'block';
           
-          // システム情報を収集
-          let debugInfo = '';
-          
-          // LIFF情報
-          debugInfo += '<h4>LIFF情報</h4>';
-          debugInfo += `<p>LIFF初期化: ${isLiffInitialized ? '成功' : '未完了'}</p>`;
-          
-          if (window.liff) {
-            try {
-              debugInfo += `<p>LIFF SDK: 利用可能</p>`;
-              debugInfo += `<p>LINEアプリ内: ${liff.isInClient() ? 'はい' : 'いいえ'}</p>`;
-              debugInfo += `<p>ログイン状態: ${liff.isLoggedIn() ? 'ログイン済み' : '未ログイン'}</p>`;
-            } catch (e) {
-              debugInfo += `<p>LIFF情報エラー: ${e.message}</p>`;
+          // 問題診断ボタンのイベントリスナー
+          document.getElementById('debug-button').addEventListener('click', function() {
+            const debugInfoEl = document.getElementById('debug-info');
+            
+            // システム情報を収集
+            let debugInfo = '';
+            
+            // LIFF情報
+            debugInfo += '<h4>LIFF情報</h4>';
+            debugInfo += `<p>LIFF初期化: ${isLiffInitialized ? '成功' : '未完了'}</p>`;
+            
+            if (window.liff) {
+              try {
+                debugInfo += `<p>LIFF SDK: 利用可能</p>`;
+                debugInfo += `<p>LINEアプリ内: ${liff.isInClient() ? 'はい' : 'いいえ'}</p>`;
+                debugInfo += `<p>ログイン状態: ${liff.isLoggedIn() ? 'ログイン済み' : '未ログイン'}</p>`;
+              } catch (e) {
+                debugInfo += `<p>LIFF情報エラー: ${e.message}</p>`;
+              }
+            } else {
+              debugInfo += `<p>LIFF SDK: 利用不可</p>`;
             }
-          } else {
-            debugInfo += `<p>LIFF SDK: 利用不可</p>`;
-          }
+            
+            // ブラウザ情報
+            debugInfo += '<h4>ブラウザ情報</h4>';
+            debugInfo += `<p>User Agent: ${navigator.userAgent}</p>`;
+            
+            // API情報
+            debugInfo += '<h4>API情報</h4>';
+            debugInfo += `<p>エンドポイント: ${API_URL}</p>`;
+            
+            // LINE UserID情報
+            if (currentLineUserId) {
+              debugInfo += '<h4>LINE情報</h4>';
+              debugInfo += `<p>LINE User ID: ${currentLineUserId}</p>`;
+            }
+            
+            // API接続テスト
+            debugInfo += '<h4>API接続テスト</h4>';
+            if (currentLineUserId) {
+              const testUrl = `${API_URL}?action=getMonthlyAttendance&lineUserId=${encodeURIComponent(currentLineUserId)}&callback=console.log`;
+              debugInfo += `<p>API接続テスト: <a href="${testUrl}" target="_blank">直接接続テスト</a> (新しいタブで開きます)</p>`;
+              debugInfo += '<p>※直接接続テストリンクをクリックしてJSON応答が表示されるか確認してください</p>';
+            }
+            
+            // ユーザーへの指示
+            debugInfo += '<h4>問題解決手順</h4>';
+            debugInfo += '<ol>';
+            debugInfo += '<li>「テストデータ表示」ボタンでテストデータを表示できます</li>';
+            debugInfo += '<li>LINEボットに「出勤」や「退勤」などのコマンドを送り、打刻してください</li>';
+            debugInfo += '<li>問題が解決しない場合は、管理者に表示されているLINE User IDを伝えてください</li>';
+            debugInfo += '</ol>';
+            
+            // 表示/非表示を切り替え
+            if (debugInfoEl.style.display === 'none') {
+              debugInfoEl.innerHTML = debugInfo;
+              debugInfoEl.style.display = 'block';
+            } else {
+              debugInfoEl.style.display = 'none';
+            }
+          });
           
-          // ブラウザ情報
-          debugInfo += '<h4>ブラウザ情報</h4>';
-          debugInfo += `<p>User Agent: ${navigator.userAgent}</p>`;
-          
-          // API情報
-          debugInfo += '<h4>API情報</h4>';
-          debugInfo += `<p>エンドポイント: ${API_URL}</p>`;
-          
-          // LINE UserID情報
-          if (currentLineUserId) {
-            debugInfo += '<h4>LINE情報</h4>';
-            debugInfo += `<p>LINE User ID: ${currentLineUserId}</p>`;
-          }
-          
-          // ユーザーへの指示
-          debugInfo += '<h4>問題解決手順</h4>';
-          debugInfo += '<ol>';
-          debugInfo += '<li>LINEボットに「出勤」や「退勤」などのコマンドを送り、打刻してください</li>';
-          debugInfo += '<li>問題が解決しない場合は、管理者に表示されているLINE User IDを伝えてください</li>';
-          debugInfo += '</ol>';
-          
-          // 表示/非表示を切り替え
-          if (debugInfoEl.style.display === 'none') {
-            debugInfoEl.innerHTML = debugInfo;
-            debugInfoEl.style.display = 'block';
-          } else {
-            debugInfoEl.style.display = 'none';
-          }
-        });
-      }
+          // テストデータ表示ボタンのイベントリスナー
+          document.getElementById('test-data-button').addEventListener('click', function() {
+            // 現在選択されている年月を取得
+            const selector = document.getElementById('month-year-selector');
+            if (selector && selector.value) {
+              const [year, month] = selector.value.split('-');
+              console.log(`テストデータ表示リクエスト: ${year}年${month}月`);
+              renderTestData(parseInt(year), parseInt(month));
+            } else {
+              // 現在の年月でテストデータを表示
+              const today = new Date();
+              console.log(`テストデータ表示リクエスト（現在）: ${today.getFullYear()}年${today.getMonth() + 1}月`);
+              renderTestData();
+            }
+          });
+        }
       
       // LIFF初期化を実行
       initializeLiff().catch(error => {
@@ -514,217 +557,279 @@
 
         let url = `${API_URL}?action=getMonthlyAttendance&lineUserId=${encodeURIComponent(lineUserId)}&year=${requestYear}&month=${requestMonth.toString().padStart(2, '0')}`;
         
-        // デバッグモードの判定
+        // パラメータの取得
         const urlParams = new URLSearchParams(window.location.search);
         const isDebugMode = urlParams.get('debug') === 'true';
+        const forceTestData = urlParams.get('forceTest') === 'true';
+        
         if (isDebugMode) {
           url += '&debug=true';
         }
         
         console.log('[DEBUG] 勤怠データ取得URL (APIリクエスト):', url);
         
+        // テストデータ強制表示モードの場合はAPIをスキップ
+        if (forceTestData) {
+          console.log('[DEBUG] 強制テストデータモード - APIスキップ');
+          const testData = renderTestData(requestYear, requestMonth);
+          return Promise.resolve(testData);
+        }
+        
+        // 通信リトライ回数
+        const maxRetries = 2;
+        let retryCount = 0;
+        
         // JSONPアプローチを使用してCORSを回避
         return new Promise((resolve, reject) => {
-          // 一意のコールバック関数名を生成
-          const callbackName = 'jsonpCallback_' + Math.random().toString(36).substring(2, 15);
-          
-          // グローバルにコールバック関数を定義
-          window[callbackName] = function(data) {
-            try {
-              // 処理完了後にスクリプトタグとコールバック関数を削除
-              if (script && script.parentNode) {
-                document.body.removeChild(script);
-              }
-              delete window[callbackName];
-              
-              // コンソールにデータを出力（デバッグ用）
-              console.log('[DEBUG] JSONP応答受信:', data);
-              
-              if (data.status === 'error' || data.error) {
-                console.error('APIエラー:', data);
-                showError(data.message || data.error || 'データ取得エラー');
-                attendanceEl.innerHTML = '';
-                reject(new Error(data.message || data.error || 'データ取得エラー'));
-                return;
-              }
-              
-              // データが配列かどうかを確認
-              if (Array.isArray(data)) {
-                if (data.length > 0) {
-                  console.log('有効なデータを受信しました。表示処理を開始します。');
-                  renderTable(data, requestYear, requestMonth);
-                  resolve(data);
-                } else {
-                  // データは配列だが空の場合（勤怠記録なし）
-                  console.warn('[DEBUG] 勤怠データが空の配列です。LINE UserID:', lineUserId);
-                  
-                  // デバッグモードの場合はユーザーIDも表示
-                  if (isDebugMode) {
-                    attendanceEl.innerHTML = `<div class="empty-result">今月の勤怠記録はありません。<br><br>以下の理由が考えられます：<br>・打刻データが登録されていない<br>・LINE UserIDと従業員情報が正しく紐づけられていない<br><br>あなたのLINE User ID:<br>${lineUserId}<br><br>LINEボットに「出勤」や「退勤」などのコマンドを送信してください。</div>`;
-                  } else {
-                    attendanceEl.innerHTML = '<div class="empty-result">今月の勤怠記録はありません。<br><br>以下の理由が考えられます：<br>・打刻データが登録されていない<br>・LINE UserIDと従業員情報が正しく紐づけられていない<br><br>LINEボットに「出勤」や「退勤」などのコマンドを送信してください。</div>';
-                  }
-                  resolve([]);
+          const tryFetchWithJsonp = () => {
+            // 一意のコールバック関数名を生成
+            const callbackName = 'jsonpCallback_' + Math.random().toString(36).substring(2, 15);
+            
+            // グローバルにコールバック関数を定義
+            window[callbackName] = function(data) {
+              try {
+                // 処理完了後にスクリプトタグとコールバック関数を削除
+                if (script && script.parentNode) {
+                  document.body.removeChild(script);
                 }
-              } else {
-                // 配列でない場合、オブジェクトである可能性を確認
-                if (typeof data === 'object' && data !== null) {
-                  console.warn('[DEBUG] APIから配列ではなくオブジェクトを受信しました:', data);
-                  
-                  // オブジェクトの可能性がある場合は変換を試みる
-                  try {
-                    // データがオブジェクトのプロパティ内にある可能性がある
-                    if (data.data && Array.isArray(data.data)) {
-                      console.log('[DEBUG] data.dataプロパティから配列を取得しました');
-                      renderTable(data.data, requestYear, requestMonth);
-                      resolve(data.data);
-                      return;
-                    }
+                delete window[callbackName];
+                
+                // コンソールにデータを出力（デバッグ用）
+                console.log('[DEBUG] JSONP応答受信:', data);
+                
+                if (data.status === 'error' || data.error) {
+                  console.error('APIエラー:', data);
+                  showError(data.message || data.error || 'データ取得エラー');
+                  attendanceEl.innerHTML = '';
+                  reject(new Error(data.message || data.error || 'データ取得エラー'));
+                  return;
+                }
+                
+                // データが配列かどうかを確認
+                if (Array.isArray(data)) {
+                  if (data.length > 0) {
+                    console.log('有効なデータを受信しました。表示処理を開始します。');
+                    renderTable(data, requestYear, requestMonth);
+                    resolve(data);
+                  } else {
+                    // データは配列だが空の場合（勤怠記録なし）
+                    console.warn('[DEBUG] 勤怠データが空の配列です。LINE UserID:', lineUserId);
                     
-                    // オブジェクトを配列に変換して表示
-                    if (Object.keys(data).length > 0) {
-                      console.log('[DEBUG] オブジェクトを配列に変換して表示します');
-                      
-                      // オブジェクトを配列に変換
-                      const recordsArray = Object.entries(data).map(([key, value]) => {
-                        if (typeof value === 'object' && value !== null) {
-                          // キーをdateとして使用する可能性
-                          if (!value.date) {
-                            value.date = key;
-                          }
-                          return value;
-                        }
-                        return null;
-                      }).filter(item => item !== null);
-                      
-                      if (recordsArray.length > 0) {
-                        console.log('[DEBUG] 変換後の配列:', recordsArray);
-                        renderTable(recordsArray, requestYear, requestMonth);
-                        resolve(recordsArray);
+                    // デバッグモードの場合はユーザーIDも表示
+                    if (isDebugMode) {
+                      attendanceEl.innerHTML = `<div class="empty-result">今月の勤怠記録はありません。<br><br>以下の理由が考えられます：<br>・打刻データが登録されていない<br>・LINE UserIDと従業員情報が正しく紐づけられていない<br><br>あなたのLINE User ID:<br>${lineUserId}<br><br>LINEボットに「出勤」や「退勤」などのコマンドを送信してください。</div>`;
+                    } else {
+                      attendanceEl.innerHTML = '<div class="empty-result">今月の勤怠記録はありません。<br><br>以下の理由が考えられます：<br>・打刻データが登録されていない<br>・LINE UserIDと従業員情報が正しく紐づけられていない<br><br>LINEボットに「出勤」や「退勤」などのコマンドを送信してください。</div>';
+                    }
+                    resolve([]);
+                  }
+                } else {
+                  // 配列でない場合、オブジェクトである可能性を確認
+                  if (typeof data === 'object' && data !== null) {
+                    console.warn('[DEBUG] APIから配列ではなくオブジェクトを受信しました:', data);
+                    
+                    // オブジェクトの可能性がある場合は変換を試みる
+                    try {
+                      // データがオブジェクトのプロパティ内にある可能性がある
+                      if (data.data && Array.isArray(data.data)) {
+                        console.log('[DEBUG] data.dataプロパティから配列を取得しました');
+                        renderTable(data.data, requestYear, requestMonth);
+                        resolve(data.data);
                         return;
                       }
+                      
+                      // オブジェクトを配列に変換して表示
+                      if (Object.keys(data).length > 0) {
+                        console.log('[DEBUG] オブジェクトを配列に変換して表示します');
+                        
+                        // オブジェクトを配列に変換
+                        const recordsArray = Object.entries(data).map(([key, value]) => {
+                          if (typeof value === 'object' && value !== null) {
+                            // キーをdateとして使用する可能性
+                            if (!value.date) {
+                              value.date = key;
+                            }
+                            return value;
+                          }
+                          return null;
+                        }).filter(item => item !== null);
+                        
+                        if (recordsArray.length > 0) {
+                          console.log('[DEBUG] 変換後の配列:', recordsArray);
+                          renderTable(recordsArray, requestYear, requestMonth);
+                          resolve(recordsArray);
+                          return;
+                        }
+                      }
+                    } catch (conversionError) {
+                      console.error('[DEBUG] データ変換エラー:', conversionError);
                     }
-                  } catch (conversionError) {
-                    console.error('[DEBUG] データ変換エラー:', conversionError);
+                  }
+                  
+                  console.error('[DEBUG] 予期しないデータ形式:', data);
+                  showError('予期しないデータ形式を受信しました。');
+                  attendanceEl.innerHTML = '';
+                  reject(new Error('予期しないデータ形式を受信しました'));
+                }
+              } catch (callbackError) {
+                console.error('[DEBUG] コールバック処理エラー:', callbackError);
+                showError(`データ処理中にエラーが発生しました: ${callbackError.message}`);
+                attendanceEl.innerHTML = '';
+                reject(callbackError);
+              }
+            };
+            
+            // JSONP用のURLにコールバックパラメータを追加
+            const jsonpUrl = `${url}&callback=${callbackName}`;
+            
+            // スクリプトタグを作成して読み込み
+            const script = document.createElement('script');
+            script.src = jsonpUrl;
+            
+            // タイムアウト処理
+            const timeoutId = setTimeout(() => {
+              // タイムアウト時の処理
+              if (window[callbackName]) {
+                delete window[callbackName];
+                if (script && script.parentNode) {
+                  try {
+                    document.body.removeChild(script);
+                  } catch (e) {
+                    console.warn('[DEBUG] スクリプト要素削除エラー:', e);
                   }
                 }
                 
-                console.error('[DEBUG] 予期しないデータ形式:', data);
-                showError('予期しないデータ形式を受信しました。');
-                attendanceEl.innerHTML = '';
-                reject(new Error('予期しないデータ形式を受信しました'));
+                // リトライ処理
+                if (retryCount < maxRetries) {
+                  retryCount++;
+                  console.log(`[DEBUG] JSONP通信タイムアウト - リトライ (${retryCount}/${maxRetries})`);
+                  tryFetchWithJsonp();
+                } else {
+                  console.error('[DEBUG] JSONP通信が最大リトライ回数に達しました - テストデータを表示します');
+                  
+                  // テストデータを表示（APIから取得できない場合のフォールバック）
+                  const testData = renderTestData(requestYear, requestMonth);
+                  
+                  // エラーメッセージ表示
+                  showError('サーバーからのデータ取得に失敗しました。テストデータを表示します。');
+                  resolve(testData);
+                }
               }
-            } catch (callbackError) {
-              console.error('[DEBUG] コールバック処理エラー:', callbackError);
-              showError(`データ処理中にエラーが発生しました: ${callbackError.message}`);
-              attendanceEl.innerHTML = '';
-              reject(callbackError);
-            }
-          };
-          
-          // JSONP用のURLにコールバックパラメータを追加
-          const jsonpUrl = `${url}&callback=${callbackName}`;
-          
-          // スクリプトタグを作成して読み込み
-          const script = document.createElement('script');
-          script.src = jsonpUrl;
-          
-          // タイムアウト処理
-          const timeoutId = setTimeout(() => {
-            // タイムアウト時の処理
-            if (window[callbackName]) {
+            }, 8000);
+            
+            script.onload = function() {
+              clearTimeout(timeoutId);
+            };
+            
+            script.onerror = function(e) {
+              clearTimeout(timeoutId);
               delete window[callbackName];
               if (script && script.parentNode) {
-                document.body.removeChild(script);
+                try {
+                  document.body.removeChild(script);
+                } catch (removeErr) {
+                  console.warn('[DEBUG] スクリプト要素削除エラー:', removeErr);
+                }
               }
-              showError('APIリクエストがタイムアウトしました。ネットワーク接続を確認してください。');
-              attendanceEl.innerHTML = '';
-              reject(new Error('APIリクエストがタイムアウトしました'));
-            }
-          }, 15000); // タイムアウト時間を延長
-          
-          script.onload = function() {
-            clearTimeout(timeoutId);
+              
+              console.error('[DEBUG] スクリプト読み込みエラー:', e);
+              
+              // リトライ処理
+              if (retryCount < maxRetries) {
+                retryCount++;
+                console.log(`[DEBUG] JSONP通信エラー - リトライ (${retryCount}/${maxRetries})`);
+                tryFetchWithJsonp();
+              } else {
+                console.error('[DEBUG] JSONP通信が最大リトライ回数に達しました - テストデータを表示します');
+                
+                // テストデータを表示（APIから取得できない場合のフォールバック）
+                const testData = renderTestData(requestYear, requestMonth);
+                
+                // エラーメッセージ表示
+                showError('サーバーからのデータ取得に失敗しました。テストデータを表示します。');
+                resolve(testData);
+              }
+            };
+            
+            // DOMに追加して読み込みを開始
+            document.body.appendChild(script);
           };
           
-          script.onerror = function(e) {
-            clearTimeout(timeoutId);
-            delete window[callbackName];
-            if (script && script.parentNode) {
-              document.body.removeChild(script);
-            }
-            console.error('[DEBUG] スクリプト読み込みエラー:', e);
-            showError('APIリクエスト中にエラーが発生しました。サーバーに接続できません。');
-            attendanceEl.innerHTML = '';
-            reject(new Error('スクリプト読み込みエラー'));
-          };
-          
-          // DOMに追加して読み込みを開始
-          document.body.appendChild(script);
+          // 初回リクエスト実行
+          tryFetchWithJsonp();
         });
       } catch (fetchError) {
         console.error('[DEBUG] APIリクエスト/処理エラー:', fetchError);
         
+        // エラー表示
         showError(`データ取得中にエラーが発生しました: ${fetchError.message}`);
-        attendanceEl.innerHTML = '';
+        
+        // テストデータで回復
+        console.log('[DEBUG] エラー発生 - テストデータを表示します');
+        const currentDate = new Date();
+        const requestYear = year || currentDate.getFullYear();
+        const requestMonth = month || (currentDate.getMonth() + 1);
+        
+        renderTestData(requestYear, requestMonth);
+        attendanceEl.innerHTML = '<div class="info-banner" style="margin-top:10px; padding:8px; background-color:#fff3cd; color:#856404; border-radius:4px; text-align:center;">エラーが発生したため、テストデータを表示しています。</div>' + attendanceEl.innerHTML;
+        
         throw fetchError;
       }
     }
     
     // デバッグ用：テスト表示
-    function renderTestData() {
-      // 現在の年月を取得
+    function renderTestData(customYear, customMonth) {
+      // 指定された年月または現在の年月を取得
       const now = new Date();
-      const year = now.getFullYear();
-      const month = now.getMonth() + 1;
+      const year = customYear || now.getFullYear();
+      const month = customMonth || now.getMonth() + 1;
       
-      // 今月の1日、2日、3日のデータを作成
-      const day1 = `${year}-${month.toString().padStart(2, '0')}-01`;
-      const day2 = `${year}-${month.toString().padStart(2, '0')}-02`;
-      const day3 = `${year}-${month.toString().padStart(2, '0')}-03`;
+      console.log(`[DEBUG] テストデータ表示: ${year}年${month}月`);
       
-      const testData = [
-        {
-          "date": day1,
-          "clockEvents": [
-            {"type": "出勤", "time": "09:00:00"},
-            {"type": "休憩開始", "time": "12:00:00"},
-            {"type": "休憩終了", "time": "13:00:00"},
-            {"type": "退勤", "time": "18:00:00"}
-          ],
-          "workStart": "09:00:00",
-          "workEnd": "18:00:00",
-          "workingHours": "8.00",
-          "breakMinutes": "60"
-        },
-        {
-          "date": day2,
-          "clockEvents": [
-            {"type": "出勤", "time": "08:30:00"},
-            {"type": "休憩開始", "time": "12:30:00"},
-            {"type": "休憩終了", "time": "13:30:00"},
-            {"type": "退勤", "time": "17:30:00"}
-          ],
-          "workStart": "08:30:00",
-          "workEnd": "17:30:00",
-          "workingHours": "8.00",
-          "breakMinutes": "60"
-        },
-        {
-          "date": day3,
-          "clockEvents": [
-            {"type": "出勤", "time": "10:00:00"},
-            {"type": "休憩開始", "time": "13:00:00"},
-            {"type": "休憩終了", "time": "14:00:00"},
-            {"type": "退勤", "time": "16:00:00"}
-          ],
-          "workStart": "10:00:00",
-          "workEnd": "16:00:00",
-          "workingHours": "5.00",
-          "breakMinutes": "60"
+      // 該当月の日数を取得
+      const daysInMonth = new Date(year, month, 0).getDate();
+      const testData = [];
+      
+      // 働く日パターン（平日のみ勤務するように設定）
+      for (let day = 1; day <= daysInMonth; day++) {
+        const date = new Date(year, month - 1, day);
+        const dayOfWeek = date.getDay(); // 0:日曜, 1:月曜, ... 6:土曜
+        
+        // 平日(月〜金)のみデータを生成
+        if (dayOfWeek >= 1 && dayOfWeek <= 5) {
+          const dateStr = `${year}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+          
+          // ランダムな出退勤時間を生成
+          const randomWorkStart = `0${8 + Math.floor(Math.random() * 2)}:${(Math.floor(Math.random() * 6) * 10).toString().padStart(2, '0')}:00`;
+          const randomWorkEnd = `${17 + Math.floor(Math.random() * 3)}:${(Math.floor(Math.random() * 6) * 10).toString().padStart(2, '0')}:00`;
+          
+          // 労働時間を計算（簡易的）
+          const startH = parseInt(randomWorkStart.split(':')[0]);
+          const startM = parseInt(randomWorkStart.split(':')[1]);
+          const endH = parseInt(randomWorkEnd.split(':')[0]);
+          const endM = parseInt(randomWorkEnd.split(':')[1]);
+          
+          const totalMinutes = (endH * 60 + endM) - (startH * 60 + startM) - 60; // 1時間休憩を想定
+          const workingHours = (totalMinutes / 60).toFixed(2);
+          
+          testData.push({
+            "date": dateStr,
+            "clockEvents": [
+              {"type": "出勤", "time": randomWorkStart},
+              {"type": "休憩開始", "time": "12:00:00"},
+              {"type": "休憩終了", "time": "13:00:00"},
+              {"type": "退勤", "time": randomWorkEnd}
+            ],
+            "workStart": randomWorkStart,
+            "workEnd": randomWorkEnd,
+            "workingHours": workingHours,
+            "breakMinutes": "60"
+          });
         }
-      ];
-      renderTable(testData);
+      }
+      
+      renderTable(testData, year, month);
+      return testData;
     }
     
     // エラーメッセージ表示
