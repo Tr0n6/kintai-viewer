@@ -271,7 +271,7 @@
     
     // グローバル変数
     let pendingScriptElements = []; // スクリプトタグの参照を保持
-    const DEBUG_MODE = false; // デバッグ情報を出力する
+    const DEBUG_MODE = true; // デバッグモードを有効化
     
     // デバッグログ用関数
     function logDebug(message, data = null) {
@@ -335,7 +335,7 @@
           // API接続テスト
           debugInfo += '<h4>API接続テスト</h4>';
           if (currentLineUserId) {
-            const testUrl = `${API_URL}?action=getMonthlyAttendance&lineUserId=${encodeURIComponent(currentLineUserId)}&jsonp=console.log`;
+            const testUrl = `${API_URL}?action=getMonthlyAttendance&lineUserId=${encodeURIComponent(currentLineUserId)}&callback=console.log`;
             debugInfo += `<p>API接続テスト: <a href="${testUrl}" target="_blank">直接接続テスト</a> (新しいタブで開きます)</p>`;
             debugInfo += '<p>※直接接続テストリンクをクリックしてJSON応答が表示されるか確認してください</p>';
             
@@ -407,7 +407,8 @@
         
         // JSONPでのフォールバックテスト
         resultElement.innerHTML += `<br>JSONPテスト実行中...`;
-        const testJsonpUrl = `${API_URL}?action=ping&jsonp=handleJsonpTest&t=${Date.now()}`;
+        const testJsonpUrl = `${API_URL}?action=ping&callback=handleJsonpTest&t=${Date.now()}`;
+        resultElement.innerHTML += `<br>テストURL: ${testJsonpUrl}`;
         
         // グローバルコールバック関数を定義
         window.handleJsonpTest = function(data) {
@@ -418,12 +419,17 @@
         // スクリプトタグを作成
         const script = document.createElement('script');
         script.src = testJsonpUrl;
-        script.onerror = function() {
+        script.onerror = function(error) {
           resultElement.innerHTML += `<br><span style="color:red">✗ JSONPテストも失敗</span>`;
+          resultElement.innerHTML += `<br>エラー詳細: ${error ? JSON.stringify(error) : 'エラー情報なし'}`;
+          resultElement.innerHTML += `<br><br>以下の手順を試してください:<br>1. GASのウェブアプリを再デプロイする<br>2. 新しいURLをAPI_URLに設定する<br>3. ページを更新して再テスト`;
           delete window.handleJsonpTest;
         };
         
         document.body.appendChild(script);
+
+        // 直接URLでもテスト
+        resultElement.innerHTML += `<br><br>直接URLテスト: <a href="${API_URL}?action=ping" target="_blank">ここをクリック</a>`;
       });
     }
     
@@ -574,12 +580,17 @@
         const requestYear = year || currentDate.getFullYear();
         const requestMonth = month || (currentDate.getMonth() + 1);
 
+        // 一意のコールバック名を生成（タイムスタンプとランダム値を組み合わせる）
+        const jsonpCallbackName = 'kintaiCallback_' + Date.now() + '_' + Math.floor(Math.random() * 1000000);
+        
         // JSONP方式でデータを取得
-        const jsonpCallbackName = 'handleAttendanceData_' + Date.now();
-        const jsonpUrl = `${API_URL}?action=getMonthlyAttendance&lineUserId=${encodeURIComponent(lineUserId)}&year=${requestYear}&month=${requestMonth.toString().padStart(2, '0')}&jsonp=${jsonpCallbackName}`;
+        const jsonpUrl = `${API_URL}?action=getMonthlyAttendance&lineUserId=${encodeURIComponent(lineUserId)}&year=${requestYear}&month=${requestMonth.toString().padStart(2, '0')}&callback=${jsonpCallbackName}`;
+        console.log('[DEBUG] JSONP URL:', jsonpUrl);
         
         // グローバルコールバック関数を設定
         window[jsonpCallbackName] = function(data) {
+          console.log('[DEBUG] コールバック関数実行:', jsonpCallbackName);
+          console.log('[DEBUG] 受信データ:', data);
           // データを受け取ったらテーブルをレンダリング
           renderTable(data, requestYear, requestMonth);
           // コールバック関数を削除（メモリリーク防止）
@@ -589,17 +600,36 @@
         // スクリプトタグを作成してJSONPリクエストを行う
         const script = document.createElement('script');
         script.src = jsonpUrl;
-        script.onerror = function() {
+        script.async = true;
+        script.onerror = function(error) {
+          console.error('[DEBUG] スクリプトロードエラー:', error);
           showError('データの取得に失敗しました。ネットワーク接続を確認してください。');
           attendanceEl.innerHTML = '<div class="empty-result">データ取得中にエラーが発生しました。<br>しばらく経ってから再度お試しください。</div>';
+          // エラー時もコールバック関数を削除
+          delete window[jsonpCallbackName];
         };
         
         // タイムアウト処理
         const timeoutId = setTimeout(() => {
           if (window[jsonpCallbackName]) {
+            console.log(`[DEBUG] タイムアウト発生: ${jsonpCallbackName}`);
             delete window[jsonpCallbackName];
             showError('データ取得がタイムアウトしました。');
-            attendanceEl.innerHTML = '<div class="empty-result">サーバーからの応答がありません。<br>しばらく経ってから再度お試しください。</div>';
+            attendanceEl.innerHTML = `
+              <div class="empty-result">
+                サーバーからの応答がありません。<br>
+                しばらく経ってから再度お試しください。<br><br>
+                <button id="direct-test" style="margin: 15px auto; padding: 10px 15px; background-color: #4a6da7; color: white; border: none; border-radius: 4px; cursor: pointer; display: block;">
+                  APIを直接テスト
+                </button>
+              </div>
+            `;
+            
+            // 直接テストボタンのイベントリスナー
+            document.getElementById('direct-test').addEventListener('click', function() {
+              const testUrl = `${API_URL}?action=ping`;
+              window.open(testUrl, '_blank');
+            });
           }
         }, 20000); // 20秒でタイムアウト
         
