@@ -265,7 +265,7 @@
   
   <script>
     // 最新のAPIエンドポイント（更新済み）
-    const API_URL = 'https://script.google.com/macros/s/AKfycbwyJeDI1M3AGQHnDSI30LkbtEa0AMRCbTr6FjmQx77CoKVV-cUxByp9fAOg9HyY5qAG/exec';
+    const API_URL = 'https://script.google.com/macros/s/AKfycbxZ6QpX3xIw6hV0WyqUlKaspWXmgeApPAQNM3cn6RCX4CIJFgFpHKB3xeX9Z_Jfskhi/exec';
     let isLiffInitialized = false;
     let currentLineUserId = null;
     
@@ -335,18 +335,31 @@
           // API接続テスト
           debugInfo += '<h4>API接続テスト</h4>';
           if (currentLineUserId) {
+            // callbackパラメータを使用した直接テストリンク
             const testUrl = `${API_URL}?action=getMonthlyAttendance&lineUserId=${encodeURIComponent(currentLineUserId)}&callback=console.log`;
             debugInfo += `<p>API接続テスト: <a href="${testUrl}" target="_blank">直接接続テスト</a> (新しいタブで開きます)</p>`;
             debugInfo += '<p>※直接接続テストリンクをクリックしてJSON応答が表示されるか確認してください</p>';
             
-            // 接続テスト用のリンクを追加
-            const directTestUrl = `${API_URL}?action=ping&lineUserId=${encodeURIComponent(currentLineUserId)}`;
-            debugInfo += `<p>単純なAPI接続テスト: <a href="${directTestUrl}" target="_blank">Ping</a></p>`;
+            // pingテスト
+            const pingUrl = `${API_URL}?action=ping`;
+            debugInfo += `<p>単純なAPI接続テスト: <a href="${pingUrl}" target="_blank">Ping</a></p>`;
+            
+            // ブラウザコンソールにも直接API URLを表示
+            debugInfo += `<p>ブラウザコンソールからテスト:</p>`;
+            debugInfo += `<code style="display:block; background:#f5f5f5; padding:5px; margin:5px 0; font-family:monospace; word-break:break-all;">
+fetch('${API_URL}?action=ping').then(r=>r.text()).then(console.log).catch(console.error)
+</code>`;
+            
+            // 標準のJSONP形式テスト
+            const jsonpTestUrl = `${API_URL}?action=ping&callback=console.log`;
+            debugInfo += `<p>JSONP形式テスト: <a href="${jsonpTestUrl}" target="_blank">JSONP</a></p>`;
+            
+            // HTML内でAPIレスポンスを表示するテスト
+            debugInfo += '<div id="api-test-result" style="margin:10px 0; padding:10px; background:#f9f9f9; border:1px solid #ddd; min-height:40px;">';
+            debugInfo += '<button id="test-api-btn" style="padding:5px 10px; background:#4a6da7; color:white; border:none; border-radius:4px; cursor:pointer;">APIをテスト</button>';
+            debugInfo += '<div id="api-response" style="margin-top:10px; font-family:monospace; font-size:12px; white-space:pre-wrap;"></div>';
+            debugInfo += '</div>';
           }
-          
-          // CORS状態テスト
-          debugInfo += '<h4>CORS状態テスト</h4>';
-          debugInfo += '<div id="cors-test-result">テスト実行中...</div>';
           
           // ユーザーへの指示
           debugInfo += '<h4>問題解決手順</h4>';
@@ -363,6 +376,41 @@
             
             // CORS状態テスト実行
             testCorsStatus();
+            
+            // APIテストボタンのイベントリスナーを追加
+            const testApiBtn = document.getElementById('test-api-btn');
+            if (testApiBtn) {
+              testApiBtn.addEventListener('click', function() {
+                const responseEl = document.getElementById('api-response');
+                if (responseEl) {
+                  responseEl.innerHTML = 'APIテスト実行中...';
+                  
+                  // 標準のJSONP方式でテスト（より安全）
+                  const callbackName = 'testApiCallback_' + Date.now();
+                  window[callbackName] = function(data) {
+                    responseEl.innerHTML = 'APIレスポンス:\n' + JSON.stringify(data, null, 2);
+                    delete window[callbackName];
+                  };
+                  
+                  const script = document.createElement('script');
+                  script.src = `${API_URL}?action=ping&callback=${callbackName}`;
+                  script.onerror = function() {
+                    responseEl.innerHTML = 'APIテスト失敗：スクリプト読み込みエラー';
+                    delete window[callbackName];
+                  };
+                  
+                  // 10秒のタイムアウト
+                  const timeoutId = setTimeout(function() {
+                    if (window[callbackName]) {
+                      responseEl.innerHTML = 'APIテスト失敗：タイムアウト';
+                      delete window[callbackName];
+                    }
+                  }, 10000);
+                  
+                  document.body.appendChild(script);
+                }
+              });
+            }
           } else {
             debugInfoEl.style.display = 'none';
           }
@@ -560,14 +608,14 @@
       document.getElementById('attendance').style.display = 'none';
     }
     
-    // LINE認証での勤怠データ取得
+    // 勤怠データ取得
     async function fetchUserAttendance(lineUserId, year, month) {
       const attendanceEl = document.getElementById('attendance');
-      const errorEl = document.getElementById('error');
       
       try {
         // ローディング表示
         attendanceEl.innerHTML = '<div class="loading">勤怠データを取得中</div>';
+        console.log(`[DEBUG] 勤怠データ取得開始: userId=${lineUserId}, year=${year}, month=${month}`);
         
         if (!lineUserId) {
           showError('ユーザーIDを取得できませんでした');
@@ -580,70 +628,115 @@
         const requestYear = year || currentDate.getFullYear();
         const requestMonth = month || (currentDate.getMonth() + 1);
 
-        // 一意のコールバック名を生成（タイムスタンプとランダム値を組み合わせる）
-        const jsonpCallbackName = 'kintaiCallback_' + Date.now() + '_' + Math.floor(Math.random() * 1000000);
+        // JSONP方式でデータを取得するための準備
+        // 一意のコールバック名を生成
+        const timestamp = Date.now();
+        const random = Math.floor(Math.random() * 1000000);
+        const jsonpCallbackName = 'kintaiCallback_' + timestamp + '_' + random;
         
-        // JSONP方式でデータを取得
+        // JSONP URL構築
         const jsonpUrl = `${API_URL}?action=getMonthlyAttendance&lineUserId=${encodeURIComponent(lineUserId)}&year=${requestYear}&month=${requestMonth.toString().padStart(2, '0')}&callback=${jsonpCallbackName}`;
         console.log('[DEBUG] JSONP URL:', jsonpUrl);
         
-        // グローバルコールバック関数を設定
-        window[jsonpCallbackName] = function(data) {
-          console.log('[DEBUG] コールバック関数実行:', jsonpCallbackName);
-          console.log('[DEBUG] 受信データ:', data);
-          // データを受け取ったらテーブルをレンダリング
-          renderTable(data, requestYear, requestMonth);
-          // コールバック関数を削除（メモリリーク防止）
-          delete window[jsonpCallbackName];
-        };
+        // 成功時のコールバック関数を設定
+        let timeoutId;
+        let requestCompleted = false;
+        let retries = 0;
+        const MAX_RETRIES = 1; // 最大再試行回数
         
-        // スクリプトタグを作成してJSONPリクエストを行う
-        const script = document.createElement('script');
-        script.src = jsonpUrl;
-        script.async = true;
-        script.onerror = function(error) {
-          console.error('[DEBUG] スクリプトロードエラー:', error);
-          showError('データの取得に失敗しました。ネットワーク接続を確認してください。');
-          attendanceEl.innerHTML = '<div class="empty-result">データ取得中にエラーが発生しました。<br>しばらく経ってから再度お試しください。</div>';
-          // エラー時もコールバック関数を削除
-          delete window[jsonpCallbackName];
-        };
-        
-        // タイムアウト処理
-        const timeoutId = setTimeout(() => {
-          if (window[jsonpCallbackName]) {
-            console.log(`[DEBUG] タイムアウト発生: ${jsonpCallbackName}`);
-            delete window[jsonpCallbackName];
-            showError('データ取得がタイムアウトしました。');
-            attendanceEl.innerHTML = `
-              <div class="empty-result">
-                サーバーからの応答がありません。<br>
-                しばらく経ってから再度お試しください。<br><br>
-                <button id="direct-test" style="margin: 15px auto; padding: 10px 15px; background-color: #4a6da7; color: white; border: none; border-radius: 4px; cursor: pointer; display: block;">
-                  APIを直接テスト
-                </button>
-              </div>
-            `;
+        // JSONP実行関数（再試行に対応）
+        const executeJsonpRequest = () => {
+          // すでに完了していたら何もしない
+          if (requestCompleted) return;
+          
+          console.log(`[DEBUG] JSONP実行 (試行${retries + 1}/${MAX_RETRIES + 1})`);
+          
+          // グローバルコールバック関数を設定
+          window[jsonpCallbackName] = function(data) {
+            console.log('[DEBUG] コールバック関数実行:', jsonpCallbackName);
+            clearTimeout(timeoutId);
+            requestCompleted = true;
             
-            // 直接テストボタンのイベントリスナー
-            document.getElementById('direct-test').addEventListener('click', function() {
-              const testUrl = `${API_URL}?action=ping`;
-              window.open(testUrl, '_blank');
-            });
-          }
-        }, 20000); // 20秒でタイムアウト
-        
-        // 元のコールバック関数を拡張して、タイムアウトをクリアする
-        const originalCallback = window[jsonpCallbackName];
-        window[jsonpCallbackName] = function(data) {
-          clearTimeout(timeoutId);
-          originalCallback(data);
+            if (data && Array.isArray(data)) {
+              console.log(`[DEBUG] データ受信成功: ${data.length}件`);
+              renderTable(data, requestYear, requestMonth);
+            } else if (data && data.status === 'error') {
+              console.error('[DEBUG] APIエラー:', data.message);
+              showError(data.message || 'データの取得に失敗しました');
+              attendanceEl.innerHTML = `<div class="empty-result">サーバーからエラーが返されました。<br>${data.message || '不明なエラー'}</div>`;
+            } else {
+              console.error('[DEBUG] 不正なデータ形式:', data);
+              showError('サーバーから不正なデータが返されました');
+              attendanceEl.innerHTML = '<div class="empty-result">データ形式が不正です。<br>管理者にお問い合わせください。</div>';
+            }
+            
+            // コールバック関数を削除（メモリリーク防止）
+            delete window[jsonpCallbackName];
+          };
+          
+          // スクリプトタグを作成してJSONPリクエストを行う
+          const script = document.createElement('script');
+          script.src = jsonpUrl;
+          script.async = true;
+          script.onerror = function(error) {
+            console.error('[DEBUG] スクリプトロードエラー:', error);
+            
+            // 再試行回数が上限に達していなければ再試行
+            if (retries < MAX_RETRIES && !requestCompleted) {
+              retries++;
+              console.log(`[DEBUG] JSONPリクエスト再試行 (${retries}/${MAX_RETRIES})`);
+              setTimeout(executeJsonpRequest, 1000); // 1秒後に再試行
+            } else if (!requestCompleted) {
+              showError('データの取得に失敗しました。ネットワーク接続を確認してください。');
+              attendanceEl.innerHTML = '<div class="empty-result">データ取得中にエラーが発生しました。<br>しばらく経ってから再度お試しください。</div>';
+              requestCompleted = true;
+              // エラー時もコールバック関数を削除
+              delete window[jsonpCallbackName];
+            }
+          };
+          
+          // タイムアウト処理（10秒）
+          timeoutId = setTimeout(() => {
+            if (!requestCompleted) {
+              console.log(`[DEBUG] タイムアウト発生: ${jsonpCallbackName}`);
+              
+              // 再試行回数が上限に達していなければ再試行
+              if (retries < MAX_RETRIES) {
+                retries++;
+                console.log(`[DEBUG] タイムアウト後の再試行 (${retries}/${MAX_RETRIES})`);
+                executeJsonpRequest(); // 再試行
+              } else {
+                delete window[jsonpCallbackName];
+                requestCompleted = true;
+                showError('データ取得がタイムアウトしました。');
+                attendanceEl.innerHTML = `
+                  <div class="empty-result">
+                    サーバーからの応答がありません。<br>
+                    しばらく経ってから再度お試しください。<br><br>
+                    <button id="direct-test" style="margin: 15px auto; padding: 10px 15px; background-color: #4a6da7; color: white; border: none; border-radius: 4px; cursor: pointer; display: block;">
+                      APIを直接テスト
+                    </button>
+                  </div>
+                `;
+                
+                // 直接テストボタンのイベントリスナー
+                document.getElementById('direct-test').addEventListener('click', function() {
+                  const testUrl = `${API_URL}?action=ping`;
+                  window.open(testUrl, '_blank');
+                });
+              }
+            }
+          }, 10000); // 10秒でタイムアウト
+          
+          // スクリプトをページに追加して実行
+          document.body.appendChild(script);
         };
         
-        // スクリプトをページに追加して実行
-        document.body.appendChild(script);
+        // 最初のJSONPリクエストを実行
+        executeJsonpRequest();
         
       } catch (error) {
+        console.error('[DEBUG] 予期しないエラー:', error);
         showError(`データ取得中にエラーが発生しました`);
         attendanceEl.innerHTML = '<div class="empty-result">予期しないエラーが発生しました。<br>しばらく経ってから再度お試しください。</div>';
       }
