@@ -230,8 +230,10 @@
     </div>
     
     <div class="controls" style="margin-bottom: 1.5rem; text-align: center;">
-      <label for="month-year-selector" style="margin-right: 8px;">表示月:</label>
-      <select id="month-year-selector" style="padding: 8px; border-radius: 4px; border: 1px solid var(--border-color);"></select>
+      <label for="month-year-selector" style="margin-right: 8px; font-weight: 500;">表示月:</label>
+      <select id="month-year-selector" style="padding: 8px 12px; border-radius: 4px; border: 1px solid var(--border-color); font-size: 16px; background-color: #fff; max-width: 150px; cursor: pointer; appearance: auto;">
+        <!-- 選択肢はJavaScriptで動的に生成 -->
+      </select>
     </div>
     
     <div id="browser-error" class="browser-error" style="display: none;">
@@ -346,7 +348,19 @@
     // 月年セレクターを生成 (例: 過去12ヶ月)
     function populateMonthYearSelector() {
         const select = document.getElementById('month-year-selector');
+        if (!select) {
+            console.error('[DEBUG] month-year-selectorが見つかりません');
+            return;
+        }
+        
+        // 既存の選択肢をクリア
+        select.innerHTML = '';
+        
+        // イベントリスナーの削除（重複登録防止）
+        select.removeEventListener('change', handleMonthYearChange);
+        
         const today = new Date();
+        // 今月と過去11ヶ月分の選択肢を追加
         for (let i = 0; i < 12; i++) {
             let date = new Date(today.getFullYear(), today.getMonth() - i, 1);
             let year = date.getFullYear();
@@ -356,14 +370,25 @@
             option.textContent = `${year}年${month}月`;
             select.appendChild(option);
         }
-        // イベントリスナーを追加して、選択が変更されたらデータを再取得
-        select.addEventListener('change', (event) => {
-            const selectedMonthYear = event.target.value;
-            if (currentLineUserId && selectedMonthYear) {
-                const [year, month] = selectedMonthYear.split('-');
-                fetchUserAttendance(currentLineUserId, parseInt(year), parseInt(month));
-            }
-        });
+        
+        // イベントリスナーを追加
+        select.addEventListener('change', handleMonthYearChange);
+        
+        console.log('[DEBUG] 月年セレクター初期化完了 - 選択肢数:', select.options.length);
+    }
+    
+    // 月年変更イベントハンドラ（別関数化して重複登録防止）
+    function handleMonthYearChange(event) {
+        const selectedMonthYear = event.target.value;
+        if (currentLineUserId && selectedMonthYear) {
+            const [year, month] = selectedMonthYear.split('-');
+            console.log(`月年変更: ${year}年${month}月`);
+            fetchUserAttendance(currentLineUserId, parseInt(year), parseInt(month));
+        } else {
+            console.warn('[DEBUG] 月年変更 - ユーザーIDまたは選択値が不正:', 
+                         'UserID:', currentLineUserId, 
+                         'Selected:', selectedMonthYear);
+        }
     }
     
     // LIFFの初期化
@@ -377,7 +402,24 @@
           console.log('開発者モード: LIFF初期化をスキップします');
           const mockUserId = urlParams.get('mockUserId');
           if (mockUserId) {
-            await fetchUserAttendance(mockUserId);
+            // ユーザーIDを保存
+            currentLineUserId = mockUserId;
+            
+            // 月年セレクターを初期化
+            populateMonthYearSelector();
+            
+                      // 初回データ取得 (セレクターの現在の値に基づいて)
+          const selector = document.getElementById('month-year-selector');
+          if (selector && selector.value) {
+              const [year, month] = selector.value.split('-');
+              console.log(`初回データ取得: ${year}年${month}月`);
+              await fetchUserAttendance(mockUserId, parseInt(year), parseInt(month));
+          } else {
+              // フォールバックとして当月データを取得
+              const today = new Date();
+              console.log(`初回データ取得（フォールバック）: ${today.getFullYear()}年${today.getMonth() + 1}月`);
+              await fetchUserAttendance(mockUserId, today.getFullYear(), today.getMonth() + 1);
+          }
           } else {
             showError('開発者モードでは mockUserId パラメータが必要です');
           }
@@ -419,13 +461,15 @@
           populateMonthYearSelector(); 
 
           // 初回データ取得 (セレクターの現在の値に基づいて)
-          const initialSelectedMonthYear = document.getElementById('month-year-selector').value;
-          if (initialSelectedMonthYear) {
-              const [year, month] = initialSelectedMonthYear.split('-');
+          const selector = document.getElementById('month-year-selector');
+          if (selector && selector.value) {
+              const [year, month] = selector.value.split('-');
+              console.log(`初回データ取得(LINE認証): ${year}年${month}月`);
               await fetchUserAttendance(lineUserId, parseInt(year), parseInt(month));
           } else {
             // フォールバックとして当月データを取得 (セレクターが何らかの理由で空の場合)
             const today = new Date();
+            console.log(`初回データ取得（LINE認証・フォールバック）: ${today.getFullYear()}年${today.getMonth() + 1}月`);
             await fetchUserAttendance(lineUserId, today.getFullYear(), today.getMonth() + 1);
           }
           
@@ -479,116 +523,151 @@
         
         console.log('[DEBUG] 勤怠データ取得URL (APIリクエスト):', url);
         
-        // データ取得 - タイムアウト10秒
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000);
-        
-        const res = await fetch(url, { signal: controller.signal });
-        clearTimeout(timeoutId);
-        
-        console.log('[DEBUG] API Response Status:', res.status, res.statusText);
-
-        if (!res.ok) {
-          console.error('[DEBUG] API応答エラー。Status:', res.status, 'Text:', res.statusText);
-          throw new Error(`API応答エラー: ${res.status} ${res.statusText}`);
-        }
-        
-        const textResponse = await res.text();
-        console.log('[DEBUG] 生のAPIレスポンス (Text):', textResponse);
-        
-        let data;
-        try {
-          data = JSON.parse(textResponse);
-        } catch (parseError) {
-          console.error('[DEBUG] JSONパースエラー:', parseError, 'レスポンス:', textResponse);
-          throw new Error('APIからの応答をJSONとして解析できません');
-        }
-        
-        // デバッグ情報 - 取得データの内容と型を詳細に出力
-        console.log('[DEBUG] 勤怠データ受信 (型):', typeof data);
-        console.log('[DEBUG] 勤怠データ受信 (配列?):', Array.isArray(data));
-        console.log('[DEBUG] 勤怠データ受信 (長さ):', Array.isArray(data) ? data.length : 'N/A');
-        console.log('[DEBUG] 勤怠データ受信 (詳細JSON):', JSON.stringify(data, null, 2));
-        
-        // エラーチェック
-        if (data.status === 'error' || data.error) {
-          console.error('APIエラー:', data);
-          showError(data.message || data.error || 'データ取得エラー');
-          attendanceEl.innerHTML = '';
-          return;
-        }
-        
-        // データが配列かどうかを確認
-        if (Array.isArray(data)) {
-          if (data.length > 0) {
-            console.log('有効なデータを受信しました。表示処理を開始します。');
-            renderTable(data, requestYear, requestMonth);
-          } else {
-            // データは配列だが空の場合（勤怠記録なし）
-            console.warn('[DEBUG] 勤怠データが空の配列です。LINE UserID:', lineUserId);
-            
-            // デバッグモードの場合はユーザーIDも表示
-            if (isDebugMode) {
-              attendanceEl.innerHTML = `<div class="empty-result">今月の勤怠記録はありません。<br><br>以下の理由が考えられます：<br>・打刻データが登録されていない<br>・LINE UserIDと従業員情報が正しく紐づけられていない<br><br>あなたのLINE User ID:<br>${lineUserId}<br><br>LINEボットに「出勤」や「退勤」などのコマンドを送信してください。</div>`;
-            } else {
-              attendanceEl.innerHTML = '<div class="empty-result">今月の勤怠記録はありません。<br><br>以下の理由が考えられます：<br>・打刻データが登録されていない<br>・LINE UserIDと従業員情報が正しく紐づけられていない<br><br>LINEボットに「出勤」や「退勤」などのコマンドを送信してください。</div>';
-            }
-          }
-        } else {
-          // 配列でない場合、オブジェクトである可能性を確認
-          if (typeof data === 'object' && data !== null) {
-            console.warn('[DEBUG] APIから配列ではなくオブジェクトを受信しました:', data);
-            
-            // オブジェクトの可能性がある場合は変換を試みる
+        // JSONPアプローチを使用してCORSを回避
+        return new Promise((resolve, reject) => {
+          // 一意のコールバック関数名を生成
+          const callbackName = 'jsonpCallback_' + Math.random().toString(36).substring(2, 15);
+          
+          // グローバルにコールバック関数を定義
+          window[callbackName] = function(data) {
             try {
-              // データがオブジェクトのプロパティ内にある可能性がある
-              if (data.data && Array.isArray(data.data)) {
-                console.log('[DEBUG] data.dataプロパティから配列を取得しました');
-                renderTable(data.data, requestYear, requestMonth);
+              // 処理完了後にスクリプトタグとコールバック関数を削除
+              if (script && script.parentNode) {
+                document.body.removeChild(script);
+              }
+              delete window[callbackName];
+              
+              // コンソールにデータを出力（デバッグ用）
+              console.log('[DEBUG] JSONP応答受信:', data);
+              
+              if (data.status === 'error' || data.error) {
+                console.error('APIエラー:', data);
+                showError(data.message || data.error || 'データ取得エラー');
+                attendanceEl.innerHTML = '';
+                reject(new Error(data.message || data.error || 'データ取得エラー'));
                 return;
               }
               
-              // オブジェクトを配列に変換して表示
-              if (Object.keys(data).length > 0) {
-                console.log('[DEBUG] オブジェクトを配列に変換して表示します');
-                
-                // オブジェクトを配列に変換
-                const recordsArray = Object.entries(data).map(([key, value]) => {
-                  if (typeof value === 'object' && value !== null) {
-                    // キーをdateとして使用する可能性
-                    if (!value.date) {
-                      value.date = key;
-                    }
-                    return value;
+              // データが配列かどうかを確認
+              if (Array.isArray(data)) {
+                if (data.length > 0) {
+                  console.log('有効なデータを受信しました。表示処理を開始します。');
+                  renderTable(data, requestYear, requestMonth);
+                  resolve(data);
+                } else {
+                  // データは配列だが空の場合（勤怠記録なし）
+                  console.warn('[DEBUG] 勤怠データが空の配列です。LINE UserID:', lineUserId);
+                  
+                  // デバッグモードの場合はユーザーIDも表示
+                  if (isDebugMode) {
+                    attendanceEl.innerHTML = `<div class="empty-result">今月の勤怠記録はありません。<br><br>以下の理由が考えられます：<br>・打刻データが登録されていない<br>・LINE UserIDと従業員情報が正しく紐づけられていない<br><br>あなたのLINE User ID:<br>${lineUserId}<br><br>LINEボットに「出勤」や「退勤」などのコマンドを送信してください。</div>`;
+                  } else {
+                    attendanceEl.innerHTML = '<div class="empty-result">今月の勤怠記録はありません。<br><br>以下の理由が考えられます：<br>・打刻データが登録されていない<br>・LINE UserIDと従業員情報が正しく紐づけられていない<br><br>LINEボットに「出勤」や「退勤」などのコマンドを送信してください。</div>';
                   }
-                  return null;
-                }).filter(item => item !== null);
-                
-                if (recordsArray.length > 0) {
-                  console.log('[DEBUG] 変換後の配列:', recordsArray);
-                  renderTable(recordsArray, requestYear, requestMonth);
-                  return;
+                  resolve([]);
                 }
+              } else {
+                // 配列でない場合、オブジェクトである可能性を確認
+                if (typeof data === 'object' && data !== null) {
+                  console.warn('[DEBUG] APIから配列ではなくオブジェクトを受信しました:', data);
+                  
+                  // オブジェクトの可能性がある場合は変換を試みる
+                  try {
+                    // データがオブジェクトのプロパティ内にある可能性がある
+                    if (data.data && Array.isArray(data.data)) {
+                      console.log('[DEBUG] data.dataプロパティから配列を取得しました');
+                      renderTable(data.data, requestYear, requestMonth);
+                      resolve(data.data);
+                      return;
+                    }
+                    
+                    // オブジェクトを配列に変換して表示
+                    if (Object.keys(data).length > 0) {
+                      console.log('[DEBUG] オブジェクトを配列に変換して表示します');
+                      
+                      // オブジェクトを配列に変換
+                      const recordsArray = Object.entries(data).map(([key, value]) => {
+                        if (typeof value === 'object' && value !== null) {
+                          // キーをdateとして使用する可能性
+                          if (!value.date) {
+                            value.date = key;
+                          }
+                          return value;
+                        }
+                        return null;
+                      }).filter(item => item !== null);
+                      
+                      if (recordsArray.length > 0) {
+                        console.log('[DEBUG] 変換後の配列:', recordsArray);
+                        renderTable(recordsArray, requestYear, requestMonth);
+                        resolve(recordsArray);
+                        return;
+                      }
+                    }
+                  } catch (conversionError) {
+                    console.error('[DEBUG] データ変換エラー:', conversionError);
+                  }
+                }
+                
+                console.error('[DEBUG] 予期しないデータ形式:', data);
+                showError('予期しないデータ形式を受信しました。');
+                attendanceEl.innerHTML = '';
+                reject(new Error('予期しないデータ形式を受信しました'));
               }
-            } catch (conversionError) {
-              console.error('[DEBUG] データ変換エラー:', conversionError);
+            } catch (callbackError) {
+              console.error('[DEBUG] コールバック処理エラー:', callbackError);
+              showError(`データ処理中にエラーが発生しました: ${callbackError.message}`);
+              attendanceEl.innerHTML = '';
+              reject(callbackError);
             }
-          }
+          };
           
-          console.error('[DEBUG] 予期しないデータ形式:', data);
-          showError('予期しないデータ形式を受信しました。');
-          attendanceEl.innerHTML = '';
-        }
+          // JSONP用のURLにコールバックパラメータを追加
+          const jsonpUrl = `${url}&callback=${callbackName}`;
+          
+          // スクリプトタグを作成して読み込み
+          const script = document.createElement('script');
+          script.src = jsonpUrl;
+          
+          // タイムアウト処理
+          const timeoutId = setTimeout(() => {
+            // タイムアウト時の処理
+            if (window[callbackName]) {
+              delete window[callbackName];
+              if (script && script.parentNode) {
+                document.body.removeChild(script);
+              }
+              showError('APIリクエストがタイムアウトしました。ネットワーク接続を確認してください。');
+              attendanceEl.innerHTML = '';
+              reject(new Error('APIリクエストがタイムアウトしました'));
+            }
+          }, 15000); // タイムアウト時間を延長
+          
+          script.onload = function() {
+            clearTimeout(timeoutId);
+          };
+          
+          script.onerror = function(e) {
+            clearTimeout(timeoutId);
+            delete window[callbackName];
+            if (script && script.parentNode) {
+              document.body.removeChild(script);
+            }
+            console.error('[DEBUG] スクリプト読み込みエラー:', e);
+            showError('APIリクエスト中にエラーが発生しました。サーバーに接続できません。');
+            attendanceEl.innerHTML = '';
+            reject(new Error('スクリプト読み込みエラー'));
+          };
+          
+          // DOMに追加して読み込みを開始
+          document.body.appendChild(script);
+        });
       } catch (fetchError) {
         console.error('[DEBUG] APIリクエスト/処理エラー:', fetchError);
         
-        if (fetchError.name === 'AbortError') {
-          showError('APIリクエストがタイムアウトしました。ネットワーク接続を確認してください。');
-        } else {
-          showError(`データ取得中にエラーが発生しました: ${fetchError.message}`);
-        }
-        
+        showError(`データ取得中にエラーが発生しました: ${fetchError.message}`);
         attendanceEl.innerHTML = '';
+        throw fetchError;
       }
     }
     
@@ -651,8 +730,18 @@
     // エラーメッセージ表示
     function showError(message) {
       const errorEl = document.getElementById('error');
+      if (!errorEl) {
+        console.error('[DEBUG] エラー表示要素が見つかりません。メッセージ:', message);
+        return;
+      }
       errorEl.textContent = message;
       errorEl.style.display = 'block';
+      console.error('[DEBUG] エラー表示:', message);
+      
+      // 5秒後に自動的に消える
+      setTimeout(() => {
+        errorEl.style.display = 'none';
+      }, 5000);
     }
     
     function renderTable(records, year, month) {
