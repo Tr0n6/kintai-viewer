@@ -234,6 +234,14 @@
       <select id="month-year-selector" style="padding: 8px 12px; border-radius: 4px; border: 1px solid var(--border-color); font-size: 16px; background-color: #fff; max-width: 150px; cursor: pointer; appearance: auto;">
         <!-- 選択肢はJavaScriptで動的に生成 -->
       </select>
+      
+      <div class="mode-selector" style="margin-top: 12px; background-color: #f5f8ff; padding: 8px; border-radius: 4px; display: inline-block;">
+        <label style="font-size: 0.9em; color: #445; cursor: pointer;">
+          <input type="checkbox" id="offline-mode-toggle" style="margin-right: 5px; cursor: pointer;">
+          <span class="mode-text">オフラインモード</span>
+          <span style="margin-left: 5px; font-size: 0.85em; color: #667;">(サーバー接続せずテストデータを表示)</span>
+        </label>
+      </div>
     </div>
     
     <div id="browser-error" class="browser-error" style="display: none;">
@@ -267,12 +275,69 @@
     let isLiffInitialized = false;
     let currentLineUserId = null;
     
+    // オフラインモード設定（ローカルストレージから読み込み、デフォルトは有効）
+    let isOfflineMode = localStorage.getItem('offlineMode') === 'false' ? false : true;
+    
+    // オフラインモードUI更新関数
+    function updateOfflineModeUI(isEnabled) {
+      const modeSelector = document.querySelector('.mode-selector');
+      const modeText = document.querySelector('.mode-text');
+      
+      if (modeSelector && modeText) {
+        if (isEnabled) {
+          modeSelector.style.backgroundColor = '#e8f4ff';
+          modeText.style.fontWeight = 'bold';
+          modeText.style.color = '#0066cc';
+        } else {
+          modeSelector.style.backgroundColor = '#f5f8ff';
+          modeText.style.fontWeight = 'normal';
+          modeText.style.color = '#445';
+        }
+      }
+    }
+    
     // ページ読み込み時にLIFFを初期化
     document.addEventListener('DOMContentLoaded', function() {
       // クエリパラメータからデバッグモードを確認
       const urlParams = new URLSearchParams(window.location.search);
       const isDebugMode = urlParams.get('debug') === 'true';
       const isTestMode = urlParams.get('test') === 'true';
+      
+      // URLパラメータでオフラインモードが指定されていれば、その設定を優先
+      if (urlParams.has('offline')) {
+        const offlineParam = urlParams.get('offline');
+        isOfflineMode = offlineParam !== 'false';
+        localStorage.setItem('offlineMode', isOfflineMode);
+      }
+      
+      // オフラインモード設定の初期化とイベントリスナー設定
+      const offlineModeToggle = document.getElementById('offline-mode-toggle');
+      if (offlineModeToggle) {
+        // チェックボックスの初期状態を設定
+        offlineModeToggle.checked = isOfflineMode;
+        
+        // 初期UIを更新
+        updateOfflineModeUI(isOfflineMode);
+        
+        // イベントリスナーを設定
+        offlineModeToggle.addEventListener('change', function() {
+          isOfflineMode = this.checked;
+          // ローカルストレージに設定を保存
+          localStorage.setItem('offlineMode', isOfflineMode);
+          console.log('[DEBUG] オフラインモード設定変更:', isOfflineMode);
+          
+          // モードに応じて表示を更新
+          updateOfflineModeUI(isOfflineMode);
+          
+          // 月セレクターの現在の値を取得
+          const selector = document.getElementById('month-year-selector');
+          if (selector && selector.value && currentLineUserId) {
+            const [year, month] = selector.value.split('-');
+            // 現在の月のデータを再取得
+            fetchUserAttendance(currentLineUserId, parseInt(year), parseInt(month));
+          }
+        });
+      }
       
       // テストモードの場合はテストデータを表示（年月指定も考慮）
       if (isTestMode) {
@@ -568,10 +633,15 @@
         
         console.log('[DEBUG] 勤怠データ取得URL (APIリクエスト):', url);
         
-        // テストデータ強制表示モードの場合はAPIをスキップ
-        if (forceTestData) {
-          console.log('[DEBUG] 強制テストデータモード - APIスキップ');
+        // オフラインモードまたはテストデータ強制表示モードの場合はAPIをスキップ
+        if (isOfflineMode || forceTestData) {
+          const reason = isOfflineMode ? 'オフラインモード' : '強制テストデータモード';
+          console.log(`[DEBUG] ${reason} - APIスキップ`);
           const testData = renderTestData(requestYear, requestMonth);
+          if (isOfflineMode) {
+            // オフラインモードではエラーバナーを表示しない
+            attendanceEl.innerHTML = '';
+          }
           return Promise.resolve(testData);
         }
         
