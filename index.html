@@ -244,8 +244,8 @@
       <p>勤怠確認はLINEアプリから行ってください。</p>
     </div>
     
-    <div id="attendance"></div>
-    <div class="error" id="error"></div>
+  <div id="attendance"></div>
+  <div class="error" id="error"></div>
     
     <div class="summary-section" style="margin-top: 1.5rem; padding: 15px; background-color: var(--secondary-color); border-radius: 6px; display: flex; justify-content: space-around;">
       <div>総労働時間: <span id="total-work-time">-</span></div>
@@ -265,7 +265,7 @@
   
   <script>
     // 最新のAPIエンドポイント（更新済み）
-    const API_URL = 'https://script.google.com/macros/s/AKfycbyA1TsoVJJyq65S3Xel12Utav836mRrSVpYH51mx7Mv88VRDs-EFNsJLGGK-Id_v4Bj/exec';
+    const API_URL = 'https://script.google.com/macros/s/AKfycbyn0yEFrYUlhYjsG3V8tgw3qMExU23Hyn_Cc0zwQXF36kB74sfvEGpRNADjsqdDjEN5/exec';
     let isLiffInitialized = false;
     let currentLineUserId = null;
     
@@ -892,9 +892,9 @@ fetch('${API_URL}?action=ping').then(r=>r.text()).then(console.log).catch(consol
         let html = `<h2>${displayYear}年${displayMonth}月の勤怠記録</h2>`;
         html += '<div class="table-container">';
         html += '<table>';
-        html += '<thead><tr>';
+      html += '<thead><tr>';
         html += '<th>日付</th><th>出勤</th><th>退勤</th><th>労働時間</th><th>休憩</th><th>打刻記録</th>';
-        html += '</tr></thead><tbody>';
+      html += '</tr></thead><tbody>';
         
         let totalWorkSeconds = 0;
         let totalBreakMinutes = 0;
@@ -913,9 +913,11 @@ fetch('${API_URL}?action=ping').then(r=>r.text()).then(console.log).catch(consol
           // 出退勤時間から時間部分のみ抽出する関数
           const formatTimeOnly = (timeStr) => {
             if (!timeStr) return '-';
+            // 文字列でない場合は変換
+            const timeString = typeof timeStr === 'string' ? timeStr : String(timeStr);
             // HH:MM:SS 形式から HH:MM のみ抽出
-            const match = String(timeStr).match(/^(\d{1,2}:\d{1,2})/);
-            return match ? match[1] : timeStr;
+            const match = timeString.match(/^(\d{1,2}:\d{1,2})/);
+            return match ? match[1] : timeString;
           };
           
           const sortedEvents = (rec.clockEvents || []);
@@ -932,21 +934,36 @@ fetch('${API_URL}?action=ping').then(r=>r.text()).then(console.log).catch(consol
           
           let workHoursDisplay = '';
           if (rec.workingHours) {
-            // workingHours が HH.mm 形式の場合や、単純な時間数の場合を考慮
-            const hoursMatch = String(rec.workingHours).match(/^(\d+)(?:\.(\d+))?$/);
-            if (hoursMatch) {
-              const hours = parseInt(hoursMatch[1]);
-              const minutesFraction = parseFloat("0." + (hoursMatch[2] || "0")); // 8.5時間などを考慮
-              totalWorkSeconds += hours * 3600 + minutesFraction * 3600; 
+            try {
+              // workingHours が HH.mm 形式の場合や、単純な時間数の場合を考慮
+              const workingHoursStr = typeof rec.workingHours === 'string' ? rec.workingHours : String(rec.workingHours);
+              const hoursMatch = workingHoursStr.match(/^(\d+)(?:\.(\d+))?$/);
+              if (hoursMatch) {
+                const hours = parseInt(hoursMatch[1]);
+                const minutesFraction = parseFloat("0." + (hoursMatch[2] || "0")); // 8.5時間などを考慮
+                totalWorkSeconds += hours * 3600 + minutesFraction * 3600; 
+              }
+              
+              // 数値として扱えるなら色分け
+              const workHoursNum = parseFloat(rec.workingHours);
+              const colorClass = !isNaN(workHoursNum) ? 
+                (workHoursNum >= 8 ? 'text-success' : (workHoursNum < 6 ? 'text-danger' : '')) : '';
+              
+              workHoursDisplay = `<span class="${colorClass}">${rec.workingHours}h</span>`;
+            } catch (err) {
+              console.warn('[DEBUG] 労働時間処理エラー:', err);
+              workHoursDisplay = `${rec.workingHours}h`;
             }
-            const colorClass = parseFloat(rec.workingHours) >= 8 ? 'text-success' : (parseFloat(rec.workingHours) < 6 ? 'text-danger' : '');
-            workHoursDisplay = `<span class="${colorClass}">${rec.workingHours}h</span>`;
           }
           
           if (rec.breakMinutes) {
-            const breakM = parseInt(rec.breakMinutes);
-            if (!isNaN(breakM)) {
-              totalBreakMinutes += breakM;
+            try {
+              const breakM = parseInt(typeof rec.breakMinutes === 'string' ? rec.breakMinutes : String(rec.breakMinutes));
+              if (!isNaN(breakM)) {
+                totalBreakMinutes += breakM;
+              }
+            } catch (err) {
+              console.warn('[DEBUG] 休憩時間処理エラー:', err);
             }
           }
 
@@ -955,17 +972,17 @@ fetch('${API_URL}?action=ping').then(r=>r.text()).then(console.log).catch(consol
               workDaysSet.add(rec.date);
           }
           
-          html += `<tr>`;
+        html += `<tr>`;
           html += `<td>${dateDisplay}</td>`;
           html += `<td class="time-value">${formatTimeOnly(rec.workStart) || '-'}</td>`;
           html += `<td class="time-value">${formatTimeOnly(rec.workEnd) || '-'}</td>`;
           html += `<td>${workHoursDisplay || '-'}</td>`;
           html += `<td>${rec.breakMinutes ? rec.breakMinutes + '分' : '-'}</td>`;
           html += `<td class="events-cell">${allClockEventsText || '-'}</td>`;
-          html += `</tr>`;
-        });
+        html += `</tr>`;
+      });
         
-        html += '</tbody></table>';
+      html += '</tbody></table>';
         html += '</div>';
         
         attendanceEl.innerHTML = html;
