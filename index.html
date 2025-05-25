@@ -913,11 +913,34 @@ fetch('${API_URL}?action=ping').then(r=>r.text()).then(console.log).catch(consol
           // 出退勤時間から時間部分のみ抽出する関数
           const formatTimeOnly = (timeStr) => {
             if (!timeStr) return '-';
-            // 文字列でない場合は変換
-            const timeString = typeof timeStr === 'string' ? timeStr : String(timeStr);
-            // HH:MM:SS 形式から HH:MM のみ抽出
-            const match = timeString.match(/^(\d{1,2}:\d{1,2})/);
-            return match ? match[1] : timeString;
+            let timeToFormat = timeStr;
+
+            // timeStr が ISO 8601形式の文字列 (例: "1899-12-30T01:12:02.000Z") かどうかを判定
+            if (typeof timeStr === 'string' && timeStr.includes('T') && timeStr.endsWith('Z')) {
+              const dateObj = new Date(timeStr);
+              // Dateオブジェクトが無効でないか確認
+              if (!isNaN(dateObj.getTime())) {
+                const hours = dateObj.getHours().toString().padStart(2, '0');
+                const minutes = dateObj.getMinutes().toString().padStart(2, '0');
+                return `${hours}:${minutes}`;
+              }
+            }
+            
+            // 文字列でない場合は文字列に変換
+            const timeString = typeof timeToFormat === 'string' ? timeToFormat : String(timeToFormat);
+            
+            // HH:MM:SS 形式または HH:MM 形式から HH:MM のみ抽出
+            // もし、"T"を含んでいたら、そこから時刻部分だけを対象にする
+            const timePartMatch = timeString.match(/(\d{1,2}:\d{1,2}(:\d{1,2})?)/);
+            if (timePartMatch && timePartMatch[1]) {
+                 const timeOnlyMatch = timePartMatch[1].match(/^(\d{1,2}:\\d{1,2})/);
+                 if (timeOnlyMatch && timeOnlyMatch[1]) {
+                    return timeOnlyMatch[1];
+                 }
+            }
+            
+            // 上記のいずれにもマッチしない場合は、元の文字列をそのまま返す（エラーや予期せぬ形式の場合）
+            return timeString;
           };
           
           const sortedEvents = (rec.clockEvents || []);
