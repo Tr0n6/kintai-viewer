@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>kintai - LINE勤怠管理システム | 無料で始める業務効率化</title>
-    <meta name="description" content="LINEで簡単に勤怠管理。無料で始められる革新的な勤怠管理システム。複数企業対応、自動計算、リアルタイム確認機能付き。">
+    <title>LINE勤怠管理システム | 無料で始める革新的な勤怠管理</title>
+    <meta name="description" content="LINEで簡単に勤怠管理。無料で始められる革新的な勤怠管理システム。人数無制限、自動計算、リアルタイム確認機能付き。">
     <style>
         :root {
             --primary-color: #00C300;
@@ -382,7 +382,7 @@
     <!-- ヘッダー -->
     <header class="header">
         <div class="container">
-            <a href="#" class="logo">kintai</a>
+            <a href="#" class="logo">LINE勤怠管理</a>
             <nav class="nav">
                 <a href="#features">機能</a>
                 <a href="#pricing">料金</a>
@@ -395,8 +395,8 @@
     <!-- ヒーローセクション -->
     <section class="hero">
         <div class="container">
-            <h1 class="animate-in">LINEで始める<br>スマート勤怠管理</h1>
-            <p class="subtitle animate-in">複雑な勤怠管理をLINE一つで解決。無料で始められる革新的な勤怠管理システム</p>
+            <h1 class="animate-in">LINEで始める<br>革新的な勤怠管理</h1>
+            <p class="subtitle animate-in">普段使いのLINEで簡単勤怠打刻。無料で始められる次世代勤怠管理システム</p>
             <a href="#signup" class="cta-button animate-in">無料で始める</a>
             <a href="#features" class="cta-button secondary animate-in">詳細を見る</a>
         </div>
@@ -405,7 +405,7 @@
     <!-- 特徴セクション -->
     <section id="features" class="features">
         <div class="container">
-            <h2 class="section-title">なぜkintaiが選ばれるのか</h2>
+            <h2 class="section-title">なぜLINE勤怠管理が選ばれるのか</h2>
             <div class="features-grid">
                 <div class="feature-card animate-in">
                     <div class="feature-icon">📱</div>
@@ -432,9 +432,9 @@
                 </div>
                 
                 <div class="feature-card animate-in">
-                    <div class="feature-icon">🏢</div>
-                    <h3>複数企業対応</h3>
-                    <p>一つのシステムで複数の企業・部署を管理可能。企業ごとに独立したデータ管理で、セキュリティも安心です。</p>
+                    <div class="feature-icon">👥</div>
+                    <h3>人数無制限</h3>
+                    <p>従業員数に関係なく、何人でもご利用いただけます。小規模から大企業まで、規模を問わず対応可能です。</p>
                 </div>
                 
                 <div class="feature-card animate-in">
@@ -457,11 +457,19 @@
                     <li>LINE勤怠打刻機能</li>
                     <li>自動計算・集計機能</li>
                     <li>月別勤怠ビューア</li>
-                    <li>複数企業対応</li>
+                    <li>人数無制限</li>
                     <li>クラウドデータ管理</li>
                     <li>メールサポート</li>
                 </ul>
                 <a href="#signup" class="cta-button">今すぐ無料で始める</a>
+                
+                <!-- テスト版の注意書きを追加 -->
+                <div style="margin-top: 2rem; padding: 1rem; background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 8px; font-size: 0.9rem; color: #856404;">
+                    <p><strong>🚧 テスト版のご案内</strong></p>
+                    <p>本システムはテスト版として無料提供しております。<br>
+                    システムの安定性向上のため、予期せぬ不具合や一時的なサービス停止が発生する場合があります。<br>
+                    ご利用の際は、あらかじめご了承ください。</p>
+                </div>
             </div>
         </div>
     </section>
@@ -469,68 +477,28 @@
     <!-- 申し込みセクション -->
     <section id="signup" class="signup">
         <div class="container">
-            <h2 class="section-title">無料でkintaiを始めよう</h2>
+            <h2 class="section-title">無料でLINE勤怠管理を始めよう</h2>
             <div class="signup-form animate-in">
                 <div id="message" class="message"></div>
                 <form id="signupForm">
                     <div class="form-group">
-                        <label for="companyName">会社名 *</label>
-                        <input type="text" id="companyName" name="companyName" required>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="contactName">ご担当者名 *</label>
-                        <input type="text" id="contactName" name="contactName" required>
+                        <label for="businessName">事業名（会社名・屋号・個人名など） *</label>
+                        <input type="text" id="businessName" name="businessName" required placeholder="例：株式会社サンプル、田中商店、田中太郎">
+                        <small style="color: #666; font-size: 0.8rem;">※法人・個人事業主・個人を問いません</small>
                     </div>
                     
                     <div class="form-group">
                         <label for="email">メールアドレス *</label>
-                        <input type="email" id="email" name="email" required>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="phone">電話番号</label>
-                        <input type="tel" id="phone" name="phone">
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="employeeCount">従業員数</label>
-                        <select id="employeeCount" name="employeeCount">
-                            <option value="">選択してください</option>
-                            <option value="1-5">1-5名</option>
-                            <option value="6-20">6-20名</option>
-                            <option value="21-50">21-50名</option>
-                            <option value="51-100">51-100名</option>
-                            <option value="101+">101名以上</option>
-                        </select>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="industry">業種</label>
-                        <select id="industry" name="industry">
-                            <option value="">選択してください</option>
-                            <option value="IT・ソフトウェア">IT・ソフトウェア</option>
-                            <option value="製造業">製造業</option>
-                            <option value="建設業">建設業</option>
-                            <option value="小売業">小売業</option>
-                            <option value="飲食業">飲食業</option>
-                            <option value="サービス業">サービス業</option>
-                            <option value="医療・福祉">医療・福祉</option>
-                            <option value="教育">教育</option>
-                            <option value="その他">その他</option>
-                        </select>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="message">ご質問・ご要望</label>
-                        <textarea id="messageText" name="message" rows="4" placeholder="導入に関するご質問やご要望がございましたらお聞かせください"></textarea>
+                        <input type="email" id="email" name="email" required placeholder="example@domain.com">
+                        <small style="color: #666; font-size: 0.8rem;">※設定方法や導入手順をご案内します</small>
                     </div>
                     
                     <button type="submit" class="submit-button">無料で申し込む</button>
                 </form>
                 <p style="margin-top: 1rem; text-align: center; color: #666; font-size: 0.9rem;">
-                    申し込み後、担当者よりメールでご連絡いたします。<br>
-                    設定方法や使い方についても丁寧にサポートいたします。
+                    申し込み後、24時間以内にメールでご連絡いたします。<br>
+                    設定方法や使い方についても丁寧にサポートいたします。<br>
+                    <strong style="color: #e67e22;">※テスト版のため、不具合が発生する可能性があることをご了承ください。</strong>
                 </p>
             </div>
         </div>
@@ -541,7 +509,7 @@
         <div class="container">
             <h2>その他の業務改善もお任せください</h2>
             <p>
-                kintai以外にも、様々な業務改善システムの開発・導入を承っております。<br>
+                LINE勤怠管理以外にも、様々な業務改善システムの開発・導入を承っております。<br>
                 在庫管理、顧客管理、売上分析、自動化ツールなど、御社の課題に合わせたソリューションをご提供いたします。
             </p>
             <a href="#" class="business-cta" id="businessInquiry">業務改善の相談をする</a>
@@ -551,40 +519,141 @@
     <!-- フッター -->
     <footer class="footer">
         <div class="container">
-            <p>&copy; 2024 kintai. すべての権利を保護します。</p>
+            <p>&copy; 2024 LINE勤怠管理システム. テスト版として提供中.</p>
         </div>
     </footer>
 
     <script>
+        // Google Formsの設定
+        const GOOGLE_FORM_CONFIG = {
+            // 実際のGoogle FormsのURLを設定してください
+            formUrl: 'https://docs.google.com/forms/d/e/YOUR_FORM_ID/formResponse',
+            
+            // 各フィールドのentry IDを設定してください（後で実際のIDに変更）
+            fields: {
+                businessName: 'entry.123456789',    // 事業名
+                email: 'entry.987654321'            // メールアドレス
+            }
+        };
+
+        // Google Formsに送信する関数
+        async function submitToGoogleForm(formData) {
+            const params = new URLSearchParams();
+            
+            // フォームデータをGoogle Forms形式に変換
+            for (const [key, value] of formData.entries()) {
+                const entryId = GOOGLE_FORM_CONFIG.fields[key];
+                if (entryId && value) {
+                    params.append(entryId, value);
+                }
+            }
+            
+            try {
+                // Google Formsに送信（iframeを使用してCORS問題を回避）
+                const iframe = document.createElement('iframe');
+                iframe.style.display = 'none';
+                iframe.name = 'hidden_iframe';
+                iframe.src = 'about:blank';
+                document.body.appendChild(iframe);
+                
+                const form = document.createElement('form');
+                form.method = 'POST';
+                form.action = GOOGLE_FORM_CONFIG.formUrl;
+                form.target = 'hidden_iframe';
+                
+                // パラメータを追加
+                for (const [key, value] of params.entries()) {
+                    const input = document.createElement('input');
+                    input.type = 'hidden';
+                    input.name = key;
+                    input.value = value;
+                    form.appendChild(input);
+                }
+                
+                document.body.appendChild(form);
+                form.submit();
+                
+                // cleanup
+                setTimeout(() => {
+                    document.body.removeChild(form);
+                    document.body.removeChild(iframe);
+                }, 1000);
+                
+                return true;
+            } catch (error) {
+                console.error('Google Formsへの送信エラー:', error);
+                return false;
+            }
+        }
+
         // フォーム送信処理
-        document.getElementById('signupForm').addEventListener('submit', function(e) {
+        document.getElementById('signupForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             
             const messageEl = document.getElementById('message');
+            const submitButton = this.querySelector('.submit-button');
             const formData = new FormData(this);
             
-            // メッセージを表示
-            messageEl.className = 'message success';
-            messageEl.style.display = 'block';
-            messageEl.innerHTML = 'お申し込みを受け付けました！担当者より3営業日以内にご連絡いたします。';
+            // ボタンを無効化
+            submitButton.disabled = true;
+            submitButton.textContent = '送信中...';
             
-            // フォームをリセット
-            this.reset();
-            
-            // 実際のデータ送信処理（ここでGoogle Formsや他のサービスに送信）
-            console.log('Form data:', Object.fromEntries(formData));
-            
-            // 3秒後にメッセージを隠す
-            setTimeout(() => {
-                messageEl.style.display = 'none';
-            }, 5000);
+            try {
+                // Google Formsに送信
+                const success = await submitToGoogleForm(formData);
+                
+                if (success) {
+                    // 成功メッセージを表示
+                    messageEl.className = 'message success';
+                    messageEl.style.display = 'block';
+                    messageEl.innerHTML = `
+                        <strong>✅ お申し込みありがとうございます！</strong><br>
+                        24時間以内に<strong>${formData.get('email')}</strong>宛に詳細をご連絡いたします。<br>
+                        設定方法から使い方まで、分かりやすくサポートいたします。
+                    `;
+                    
+                    // フォームをリセット
+                    this.reset();
+                    
+                    // Google Analytics等でコンバージョントラッキング（必要に応じて）
+                    if (typeof gtag !== 'undefined') {
+                        gtag('event', 'conversion', {
+                            'send_to': 'YOUR_CONVERSION_ID'
+                        });
+                    }
+                    
+                } else {
+                    throw new Error('送信に失敗しました');
+                }
+                
+            } catch (error) {
+                console.error('送信エラー:', error);
+                
+                // エラーメッセージを表示
+                messageEl.className = 'message error';
+                messageEl.style.display = 'block';
+                messageEl.innerHTML = `
+                    <strong>❌ 送信に失敗しました</strong><br>
+                    お手数ですが、しばらく時間をおいて再度お試しいただくか、<br>
+                    直接メールでお問い合わせください：info@your-domain.com
+                `;
+            } finally {
+                // ボタンを元に戻す
+                submitButton.disabled = false;
+                submitButton.textContent = '無料で申し込む';
+                
+                // 8秒後にメッセージを隠す
+                setTimeout(() => {
+                    messageEl.style.display = 'none';
+                }, 8000);
+            }
         });
         
         // 業務改善相談リンククリック処理
         document.getElementById('businessInquiry').addEventListener('click', function(e) {
             e.preventDefault();
-            // Googleフォームのリンクに飛ばす（後で実際のリンクに変更）
-            window.open('https://forms.google.com/your-business-form-link', '_blank');
+            // 実際のGoogle Formsリンクを設定してください
+            window.open('https://forms.google.com/d/e/YOUR_BUSINESS_FORM_ID/viewform', '_blank');
         });
         
         // スムーススクロール
@@ -618,6 +687,22 @@
         // アニメーション対象要素を監視
         document.querySelectorAll('.feature-card, .pricing-card, .signup-form').forEach(el => {
             observer.observe(el);
+        });
+
+        // フォームバリデーション強化
+        document.querySelectorAll('input[required], select[required], textarea[required]').forEach(field => {
+            field.addEventListener('invalid', function(e) {
+                e.preventDefault();
+                this.style.borderColor = '#dc3545';
+                this.style.boxShadow = '0 0 0 0.2rem rgba(220, 53, 69, 0.25)';
+            });
+            
+            field.addEventListener('input', function() {
+                if (this.validity.valid) {
+                    this.style.borderColor = '#28a745';
+                    this.style.boxShadow = '0 0 0 0.2rem rgba(40, 167, 69, 0.25)';
+                }
+            });
         });
     </script>
 </body>
