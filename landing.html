@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LINE勤怠管理システム | 無料で始める革新的な勤怠管理</title>
-    <meta name="description" content="LINEで簡単に勤怠管理。無料で始められる革新的な勤怠管理システム。人数無制限、自動計算、リアルタイム確認機能付き。">
+    <title>LINE勤怠管理システム | 完全無料・人数無制限で始める革新的な勤怠管理</title>
+    <meta name="description" content="LINEで簡単に勤怠管理。完全無料・人数無制限で始められる革新的な勤怠管理システム。自動計算、リアルタイム確認機能付き。">
     <style>
         :root {
             --primary-color: #00C300;
@@ -16,6 +16,7 @@
             --warning-color: #ffc107;
             --danger-color: #dc3545;
             --gradient-primary: linear-gradient(135deg, #00C300 0%, #0084ff 100%);
+            --gradient-gold: linear-gradient(135deg, #ffd700 0%, #ffb347 100%);
         }
         
         * {
@@ -83,6 +84,7 @@
             color: white;
             padding: 4rem 0;
             text-align: center;
+            position: relative;
         }
         
         .hero h1 {
@@ -95,6 +97,26 @@
             font-size: 1.3rem;
             margin-bottom: 2rem;
             opacity: 0.9;
+        }
+        
+        /* 無料・無制限バッジ */
+        .free-badge {
+            display: inline-block;
+            background: var(--gradient-gold);
+            color: #333;
+            padding: 1rem 2rem;
+            border-radius: 50px;
+            font-weight: bold;
+            font-size: 1.4rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 5px 15px rgba(255, 215, 0, 0.3);
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
         }
         
         .cta-button {
@@ -164,7 +186,100 @@
             color: var(--primary-color);
         }
         
-        /* 価格セクション */
+        /* ビジネス向けセクション（目立つ位置に移動） */
+        .business {
+            padding: 4rem 0;
+            background: var(--gradient-gold);
+            color: #333;
+            text-align: center;
+            position: relative;
+        }
+        
+        .business::before {
+            content: "💡 業務改善で収益UP";
+            position: absolute;
+            top: 1rem;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #ff4757;
+            color: white;
+            padding: 0.5rem 1.5rem;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: bold;
+        }
+        
+        .business h2 {
+            font-size: 2.8rem;
+            margin-bottom: 2rem;
+            font-weight: bold;
+        }
+        
+        .business p {
+            font-size: 1.3rem;
+            margin-bottom: 2rem;
+            max-width: 900px;
+            margin-left: auto;
+            margin-right: auto;
+            line-height: 1.7;
+        }
+        
+        .google-services {
+            background: white;
+            border-radius: 15px;
+            padding: 2rem;
+            margin: 2rem auto;
+            max-width: 800px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        }
+        
+        .google-services h3 {
+            color: var(--primary-color);
+            font-size: 1.8rem;
+            margin-bottom: 1rem;
+        }
+        
+        .services-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        
+        .service-item {
+            background: #f8f9fa;
+            padding: 1rem;
+            border-radius: 8px;
+            text-align: center;
+        }
+        
+        .business-cta {
+            background: #ff4757;
+            color: white;
+            padding: 1.5rem 3rem;
+            border-radius: 50px;
+            text-decoration: none;
+            font-weight: bold;
+            font-size: 1.3rem;
+            transition: transform 0.3s, box-shadow 0.3s;
+            display: inline-block;
+            margin: 1rem;
+        }
+        
+        .business-cta:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(255, 71, 87, 0.3);
+        }
+        
+        .business-cta.secondary {
+            background: #2c3e50;
+        }
+        
+        .business-cta.secondary:hover {
+            box-shadow: 0 8px 25px rgba(44, 62, 80, 0.3);
+        }
+        
+        /* 料金セクション */
         .pricing {
             padding: 4rem 0;
             text-align: center;
@@ -272,44 +387,6 @@
             box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
         }
         
-        /* ビジネス向けセクション */
-        .business {
-            padding: 4rem 0;
-            background: #1a1a1a;
-            color: white;
-            text-align: center;
-        }
-        
-        .business h2 {
-            font-size: 2.5rem;
-            margin-bottom: 2rem;
-        }
-        
-        .business p {
-            font-size: 1.2rem;
-            margin-bottom: 2rem;
-            max-width: 800px;
-            margin-left: auto;
-            margin-right: auto;
-        }
-        
-        .business-cta {
-            background: var(--warning-color);
-            color: #1a1a1a;
-            padding: 1rem 2rem;
-            border-radius: 50px;
-            text-decoration: none;
-            font-weight: bold;
-            font-size: 1.2rem;
-            transition: transform 0.3s, box-shadow 0.3s;
-            display: inline-block;
-        }
-        
-        .business-cta:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(255, 193, 7, 0.3);
-        }
-        
         /* フッター */
         .footer {
             background: #333;
@@ -338,6 +415,15 @@
             
             .signup-form {
                 padding: 2rem 1rem;
+            }
+            
+            .services-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .business-cta {
+                padding: 1rem 2rem;
+                font-size: 1.1rem;
             }
         }
         
@@ -385,9 +471,9 @@
             <a href="#" class="logo">LINE勤怠管理</a>
             <nav class="nav">
                 <a href="#features">機能</a>
+                <a href="#business">業務改善</a>
                 <a href="#pricing">料金</a>
                 <a href="#signup">申し込み</a>
-                <a href="#business">業務改善</a>
             </nav>
         </div>
     </header>
@@ -395,10 +481,11 @@
     <!-- ヒーローセクション -->
     <section class="hero">
         <div class="container">
+            <div class="free-badge animate-in">🎉 完全無料 × 人数無制限 🎉</div>
             <h1 class="animate-in">LINEで始める<br>革新的な勤怠管理</h1>
-            <p class="subtitle animate-in">普段使いのLINEで簡単勤怠打刻。無料で始められる次世代勤怠管理システム</p>
-            <a href="#signup" class="cta-button animate-in">無料で始める</a>
-            <a href="#features" class="cta-button secondary animate-in">詳細を見る</a>
+            <p class="subtitle animate-in">普段使いのLINEで簡単勤怠打刻。導入費用・月額費用・人数制限一切なし！</p>
+            <a href="#signup" class="cta-button animate-in">今すぐ無料で始める</a>
+            <a href="#business" class="cta-button secondary animate-in">業務改善相談</a>
         </div>
     </section>
 
@@ -407,6 +494,12 @@
         <div class="container">
             <h2 class="section-title">なぜLINE勤怠管理が選ばれるのか</h2>
             <div class="features-grid">
+                <div class="feature-card animate-in">
+                    <div class="feature-icon">💰</div>
+                    <h3>完全無料・人数無制限</h3>
+                    <p>導入費用、月額費用、従業員数による制限は一切ありません。1人でも100人でも、永続的に無料でご利用いただけます。</p>
+                </div>
+                
                 <div class="feature-card animate-in">
                     <div class="feature-icon">📱</div>
                     <h3>LINE一つで完結</h3>
@@ -432,17 +525,94 @@
                 </div>
                 
                 <div class="feature-card animate-in">
-                    <div class="feature-icon">👥</div>
-                    <h3>人数無制限</h3>
-                    <p>従業員数に関係なく、何人でもご利用いただけます。小規模から大企業まで、規模を問わず対応可能です。</p>
-                </div>
-                
-                <div class="feature-card animate-in">
                     <div class="feature-icon">☁️</div>
                     <h3>クラウド管理</h3>
                     <p>Google Spreadsheetベースでデータを管理。どこからでもアクセス可能で、バックアップも自動で安心です。</p>
                 </div>
             </div>
+        </div>
+    </section>
+
+    <!-- ビジネス向けセクション（目立つ位置に移動） -->
+    <section id="business" class="business">
+        <div class="container">
+            <h2>🚀 その他の業務改善もお任せください</h2>
+            <p>
+                <strong>LINE勤怠管理以外にも、様々な業務改善システムの開発・導入を承っております。</strong><br>
+                Googleサービスなど普段お使いのツールを活用することで、<strong>運用費0円で業務効率を大幅改善</strong>いたします。
+            </p>
+            
+            <div class="google-services animate-in">
+                <h3>🔧 活用するGoogleサービス例</h3>
+                <div class="services-grid">
+                    <div class="service-item">
+                        <strong>📊 Google Sheets</strong><br>
+                        データベース・在庫管理
+                    </div>
+                    <div class="service-item">
+                        <strong>📋 Google Forms</strong><br>
+                        受注・問い合わせ管理
+                    </div>
+                    <div class="service-item">
+                        <strong>📧 Gmail</strong><br>
+                        自動メール送信
+                    </div>
+                    <div class="service-item">
+                        <strong>📅 Google Calendar</strong><br>
+                        予約・スケジュール管理
+                    </div>
+                    <div class="service-item">
+                        <strong>💾 Google Drive</strong><br>
+                        ファイル共有・管理
+                    </div>
+                    <div class="service-item">
+                        <strong>📱 LINE</strong><br>
+                        通知・コミュニケーション
+                    </div>
+                </div>
+                <p style="color: #666; font-size: 1rem;">
+                    ✨ <strong>月額費用0円</strong>で在庫管理、顧客管理、売上分析、自動化ツールなどを実現
+                </p>
+            </div>
+            
+            <div style="background: white; border-radius: 15px; padding: 2rem; margin: 2rem auto; max-width: 800px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);">
+                <h3 style="color: var(--primary-color); font-size: 1.8rem; margin-bottom: 1rem;">💡 こんな業務改善システムを構築可能</h3>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem;">
+                    <div style="background: #f8f9fa; padding: 1.5rem; border-radius: 8px;">
+                        <strong style="color: #333;">🏪 在庫管理システム</strong><br>
+                        <small style="color: #666;">商品の入出庫をLINEで報告、Sheetで自動集計</small>
+                    </div>
+                    <div style="background: #f8f9fa; padding: 1.5rem; border-radius: 8px;">
+                        <strong style="color: #333;">👥 顧客管理システム</strong><br>
+                        <small style="color: #666;">問い合わせフォームから自動でDB化・メール送信</small>
+                    </div>
+                    <div style="background: #f8f9fa; padding: 1.5rem; border-radius: 8px;">
+                        <strong style="color: #333;">📊 売上分析システム</strong><br>
+                        <small style="color: #666;">日々の売上入力から自動グラフ・レポート生成</small>
+                    </div>
+                    <div style="background: #f8f9fa; padding: 1.5rem; border-radius: 8px;">
+                        <strong style="color: #333;">📅 予約管理システム</strong><br>
+                        <small style="color: #666;">フォームからの予約を自動でカレンダー登録</small>
+                    </div>
+                    <div style="background: #f8f9fa; padding: 1.5rem; border-radius: 8px;">
+                        <strong style="color: #333;">🔔 自動通知システム</strong><br>
+                        <small style="color: #666;">締切や重要事項をLINE・メールで自動送信</small>
+                    </div>
+                    <div style="background: #f8f9fa; padding: 1.5rem; border-radius: 8px;">
+                        <strong style="color: #333;">📋 業務報告システム</strong><br>
+                        <small style="color: #666;">日報・週報をフォームで収集・自動集計</small>
+                    </div>
+                </div>
+                <p style="color: #e67e22; font-weight: bold; font-size: 1.1rem; text-align: center; margin-bottom: 1rem;">
+                    🎯 すべて月額0円で運用可能！
+                </p>
+                <p style="color: #666; font-size: 0.95rem; text-align: center;">
+                    Googleの無料ツールを組み合わせることで、高機能な業務システムを構築します。<br>
+                    御社の課題をお聞かせください。最適なソリューションをご提案いたします。
+                </p>
+            </div>
+            
+            <a href="#" class="business-cta" id="businessInquiry">💡 無料で業務改善相談</a>
         </div>
     </section>
 
@@ -452,12 +622,12 @@
             <h2 class="section-title">シンプルな料金体系</h2>
             <div class="pricing-card animate-in">
                 <div class="price">¥0<span style="font-size: 1rem; color: #666;">/月</span></div>
-                <p class="price-description">完全無料でご利用いただけます</p>
+                <p class="price-description">完全無料・人数無制限でご利用いただけます</p>
                 <ul class="price-features">
+                    <li><strong>人数無制限</strong> - 1人でも1000人でもOK</li>
                     <li>LINE勤怠打刻機能</li>
                     <li>自動計算・集計機能</li>
                     <li>月別勤怠ビューア</li>
-                    <li>人数無制限</li>
                     <li>クラウドデータ管理</li>
                     <li>メールサポート</li>
                 </ul>
@@ -504,22 +674,10 @@
         </div>
     </section>
 
-    <!-- ビジネス向けセクション -->
-    <section id="business" class="business">
-        <div class="container">
-            <h2>その他の業務改善もお任せください</h2>
-            <p>
-                LINE勤怠管理以外にも、様々な業務改善システムの開発・導入を承っております。<br>
-                在庫管理、顧客管理、売上分析、自動化ツールなど、御社の課題に合わせたソリューションをご提供いたします。
-            </p>
-            <a href="#" class="business-cta" id="businessInquiry">業務改善の相談をする</a>
-        </div>
-    </section>
-
     <!-- フッター -->
     <footer class="footer">
         <div class="container">
-            <p>&copy; 2024 LINE勤怠管理システム. テスト版として提供中.</p>
+            <p>&copy; 2024 LINE勤怠管理システム. テスト版として提供中. | <a href="#business" style="color: #ffd700;">業務改善のご相談はこちら</a></p>
         </div>
     </footer>
 
@@ -685,7 +843,7 @@
         }, observerOptions);
         
         // アニメーション対象要素を監視
-        document.querySelectorAll('.feature-card, .pricing-card, .signup-form').forEach(el => {
+        document.querySelectorAll('.feature-card, .pricing-card, .signup-form, .google-services').forEach(el => {
             observer.observe(el);
         });
 
